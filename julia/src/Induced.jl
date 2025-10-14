@@ -67,11 +67,10 @@ function induced_channel_and_hashing_bound(H::AbstractMatrix{Bool},
     # Prepare output pbar
     pbar = zeros(Float64, A, A)
 
-    # ccall into Rust
-    lib = DEFAULT_RUST_LIB
-    @assert isfile(lib) "Rust library not found at: $lib. Set QEC_RUST_LIB if needed."
+    # ccall into Rust — must use compile-time-constant library expression
+    @assert isfile(DEFAULT_RUST_LIB) "Rust library not found at: $(DEFAULT_RUST_LIB). Set QEC_RUST_LIB if needed."
 
-    hashing_bound = ccall((:compute_pbar_and_hashing_bound, lib), Float64,
+    hashing_bound = ccall((:compute_pbar_and_hashing_bound, DEFAULT_RUST_LIB), Float64,
         ( Ptr{UInt64}, Ptr{UInt64}, Csize_t, Csize_t,
           Ptr{UInt64}, Ptr{UInt64}, Csize_t,
           Ptr{UInt64}, Ptr{UInt64}, Csize_t,
@@ -91,4 +90,5 @@ function induced_channel_and_hashing_bound(H::AbstractMatrix{Bool},
 end
 
 end # module
+
 
