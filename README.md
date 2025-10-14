@@ -133,7 +133,7 @@ strip = true
 From the repo root:
 ```bash
 cd julia
-julia --project -e 'using Pkg; Pkg.instantiate()'
+julia --project -e 'using Pkg; Pkg.precompile(); using QECInduced; println("OK")'
 ```
 
 ---
