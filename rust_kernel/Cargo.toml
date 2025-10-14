@@ -1,0 +1,17 @@
+---
+
+## rust-kernel/Cargo.toml
+
+```toml
+[package]
+name = "rust-kernel"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "rust_kernel"
+crate-type = ["cdylib"]
+
+[dependencies]
+rayon = "1.10"
+

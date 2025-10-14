@@ -1,0 +1,21 @@
+# ---- Rust ----
+/rust_kernel/target/
+/rust_kernel/Cargo.lock
+
+# ---- Julia ----
+/julia/Manifest.toml
+/julia/.DS_Store
+.julia/
+*.jl.cov
+*.jl.*.cov
+*.mem
+*.ji
+
+# ---- OS/editor ----
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+.idea/
+.vscode/
+

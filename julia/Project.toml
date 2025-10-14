@@ -1,0 +1,9 @@
+name = "QECInduced"
+uuid = "a3f3aab1-92e5-4bd7-900e-3b7d7a7cfb0e"
+authors = ["You"]
+version = "0.1.0"
+
+[deps]
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
+
