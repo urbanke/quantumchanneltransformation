@@ -67,7 +67,7 @@ function tableau_from_stabilizers(S::AbstractMatrix{Bool})
     work = copy(chosen)
 
     # “pair-clean” against existing pairs
-    function clean_against_pairs!(x::Vector{Bool}, pairs::Vector{Tuple{Vector{Bool},Vector{Bool}}})
+    function clean_against_pairs!(x::AbstractVector{Bool}, pairs::Vector{Tuple{Vector{Bool},Vector{Bool}}})
         for (a,b) in pairs
             # x ← x ⊕ <x,b>a ⊕ <x,a>b
             if symp_inner(x, b)
@@ -84,8 +84,6 @@ function tableau_from_stabilizers(S::AbstractMatrix{Bool})
     # Otherwise, it will become a logical.
     for i in 1:2n
         g = copy(view(work, i, :))
-        clean_against_pairs!(g, pairs)
-
         if hcount < r && in_spanS(g)
             # find first h that anticommutes with g among remaining rows
             partner = nothing
