@@ -184,24 +184,48 @@ julia --project myrun.jl
 
 ### 3-Qubit Repetition Code Example
 
-Here \(n=3, r=2\). Use \((u|v)\) of length \(2n=6\).  
-\(Z_1Z_2 = (000|110)\), \(Z_2Z_3 = (000|011)\).
-
 ```julia
 using QECInduced
 
-n = 3
-S = falses(2, 2n)
-S[1, n+1] = true; S[1, n+2] = true   # Z1Z2
-S[2, n+2] = true; S[2, n+3] = true   # Z2Z3
+# 3-qubit Z-type repetition code (bit-flip code)
+# Pauli vector format is (u | v) with length 2n
+#  - X on qubit i -> u_i = 1, v_i = 0
+#  - Z on qubit i -> u_i = 0, v_i = 1
 
+n = 3
+S = falses(2, 2n)  # 2 stabilizers, 2n columns
+
+# Stabilizers: Z1 Z2  and  Z2 Z3
+# Row 1: (u=000 | v=110)
+S[1, n+1] = true  # v1
+S[1, n+2] = true  # v2
+
+# Row 2: (u=000 | v=011)
+S[2, n+2] = true  # v2
+S[2, n+3] = true  # v3
+
+# Ensure it's a plain Bool matrix
+S = Matrix{Bool}(S)
+
+# Build tableau/logicals
 H, Lx, Lz, G = QECInduced.tableau_from_stabilizers(S)
 
-pbar, hb = QECInduced.induced_channel_and_hashing_bound(H, Lx, Lz, G; p=0.1)
-println("HB = ", hb)
+@show size(H)  # (r, 2n)
+@show size(Lx) # (k, 2n)
+@show size(Lz) # (k, 2n)
+@show size(G)  # (r, 2n)
 
-grid = QECInduced.sweep_depolarizing_grid(H, Lx, Lz, G; p_min=0.0, p_max=0.3, step=0.05, threads=4)
-println(grid)
+# k should be 1 for the 3-qubit repetition code
+@assert size(Lx, 1) == 1 && size(Lz, 1) == 1 "Expected k=1 logical qubit"
+
+# Depolarizing channel with probability p
+p = 0.10
+
+# Call the public wrapper: it expects keyword `p::Float64`
+pbar, hashing = QECInduced.induced_channel_and_hashing_bound(H, Lx, Lz, G; p=p)
+
+@show size(pbar)
+@show hashing
 ```
 
 ---
