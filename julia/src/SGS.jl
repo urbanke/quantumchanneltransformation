@@ -46,7 +46,6 @@ function tableau_from_stabilizers(S::AbstractMatrix{Bool})
 
     # Run a symplectic Gram–Schmidt that preserves the invariant:
     # the first r pairs have first elements in span(S).
-    # For brevity (and robustness), we re-use a standard algorithmic scheme:
     H = falses(r, 2n)
     G = falses(r, 2n)
     Lx = falses(n - r, 2n)
@@ -67,6 +66,7 @@ function tableau_from_stabilizers(S::AbstractMatrix{Bool})
     work = copy(chosen)
 
     # “pair-clean” against existing pairs
+    # Accept AbstractVector{Bool} so BitVector rows also work.
     function clean_against_pairs!(x::AbstractVector{Bool}, pairs::Vector{Tuple{Vector{Bool},Vector{Bool}}})
         for (a,b) in pairs
             # x ← x ⊕ <x,b>a ⊕ <x,a>b
@@ -103,7 +103,7 @@ function tableau_from_stabilizers(S::AbstractMatrix{Bool})
         else
             # treat as logical pair first element if needed
             if lcount < n - r
-                # find partner
+                # try to find an anticommuting partner from remaining rows
                 partner = nothing
                 for j in i+1:2n
                     h = copy(view(work, j, :))
@@ -113,7 +113,47 @@ function tableau_from_stabilizers(S::AbstractMatrix{Bool})
                         break
                     end
                 end
-                @assert partner !== nothing "Could not find logical partner"
+
+                # ---- Fallback for pure-Z or pure-X stabilizer sets ----
+                if partner === nothing
+                    # Construct a minimal partner that anticommutes with g:
+                    # If g has an X-bit at i (u_i=1), choose h = Z_i;
+                    # else if g has a Z-bit at i (v_i=1), choose h = X_i;
+                    # else pick the first qubit and set h = Z_1 (then enforce anticommutation).
+                    h = falses(2n)
+                    iu = findfirst(@view g[1:n])
+                    if iu !== nothing
+                        # g has X on iu -> choose Z on iu
+                        h[n + iu] = true
+                        # clean w.r.t. existing pairs to preserve prior commutations
+                        clean_against_pairs!(h, pairs)
+                        # ensure <g,h> = 1; if not, flip the complementary bit on same iu
+                        if !symp_inner(g, h)
+                            h[iu] = !h[iu]  # toggle X on iu
+                        end
+                    else
+                        iv = findfirst(@view g[n+1:2n])
+                        if iv !== nothing
+                            # g has Z on iv -> choose X on iv
+                            h[iv] = true
+                            clean_against_pairs!(h, pairs)
+                            if !symp_inner(g, h)
+                                h[n + iv] = !h[n + iv]  # toggle Z on iv
+                            end
+                        else
+                            # g is (unexpectedly) zero; pick qubit 1 and make Z_1
+                            h[n + 1] = true
+                            clean_against_pairs!(h, pairs)
+                            # enforce anticommutation by toggling X_1 if needed
+                            if !symp_inner(g, h)
+                                h[1] = !h[1]
+                            end
+                        end
+                    end
+                    partner = h
+                end
+                # --------------------------------------------------------
+
                 lcount += 1
                 Lx[lcount, :] .= g
                 Lz[lcount, :] .= partner
