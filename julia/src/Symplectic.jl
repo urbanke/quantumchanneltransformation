@@ -65,5 +65,48 @@ function xorrows(pattern::AbstractVector{Bool}, basis::AbstractMatrix{Bool})
     out
 end
 
+
+function sanity_check(H::AbstractMatrix{Bool},Lx::AbstractMatrix{Bool},Lz::AbstractMatrix{Bool},G::AbstractMatrix{Bool})
+    T = vcat(H,Lx,G,Lz) 
+    m = size(T,1)
+    n = div(size(T,2),2)
+    failure = 0 
+    for i in 1:m
+        for j in i:m
+            if symp_inner(view(T,i,:), view(T,j,:)) & ((j!==i+n)) # this means it anticommutes at something that is not a pair(this is pair) 
+               return false  
+            end
+            if !(symp_inner(view(T,i,:), view(T,j,:))) & ((j==i+n)) # this means it commutes at the opposite pair (this is bad)
+                return false
+            end
+        end
+    end
+    true
+end 
+
+function build_from_stabs(StabString::Vector{String}) #  
+    k = size(StabString,1)
+    n = length(StabString[1])
+    S = falses(k, 2*n)  # k stabilizers, 2n columns   
+    m = size(StabString,1) 
+    for i in 1:m
+        stab = StabString[i]
+        for j in 1:n
+            s = stab[j]
+            print(s)
+            if s == 'X' || s == 'Y'
+                S[i,j] = true 
+            end 
+            if s == 'Z' || s == 'Y' 
+                S[i,j+n] = true 
+            end 
+        end
+        println()
+    end
+    return S
+end
+
+
+
 end # module
 
