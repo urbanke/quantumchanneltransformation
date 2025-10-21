@@ -17,6 +17,20 @@ using .Bitpack
 using .Induced
 using .ParallelSweep
 
+
+
+function H(p::AbstractVector{<:Real})
+    s = 0.0
+    @inbounds for v in p
+        if v > 0
+            s -= v * log2(v)
+        end
+    end
+    return s
+end
+
+
+
 """
     tableau_from_stabilizers(S::AbstractMatrix{Bool})
 
