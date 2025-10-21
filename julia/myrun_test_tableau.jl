@@ -9,7 +9,8 @@ using QECInduced, .Symplectic
 
 
 #Stabilizers = ["XZZXI", "IXZZX", "XIXZZ", "ZXIXZ"]
-Stabilizers = ["ZZIZZIZZI", "IZZIZZIZZ", "IIIXXXXXX", "XXXXXXIII"]
+Stabilizers = ["ZZIIIIIII", "IZZIIIIII", "IIIZZIIII", "IIIIZZIII","IIIIIIZZI","IIIIIIIZZ","IIIXXXXXX","XXXXXXIII"]
+#Stabilizers = ["ZZIZZIZZI", "IZZIZZIZZ", "IIIXXXXXX", "XXXXXXIII"]
 S = Symplectic.build_from_stabs(Stabilizers)
 @show S
 
@@ -50,5 +51,40 @@ pbar, hashing_induced = QECInduced.induced_channel_and_hashing_bound(H, Lx, Lz, 
 @show size(pbar)
 @show hashing_induced
 
-grid = QECInduced.sweep_depolarizing_grid(H, Lx, Lz, G; p_min=0.0, p_max=0.3, step=0.01, threads=4)
+grid = QECInduced.sweep_depolarizing_grid(H, Lx, Lz, G; p_min=0.0, p_max=0.5, step=0.01, threads=4)
 println("grid:\n", grid)
+
+
+
+# -----------------------------
+# Plot the (p, hashing_orig, hashing_induced) triplets you provided
+# -----------------------------
+# Data format: each row is [p, hashing_bound_original, hashing_bound_induced]
+
+ps  = grid[:, 1]
+hib = grid[:, 2]  # original hashing bound
+hob =  grid[:, 3]  # induced hashing bound
+
+# Bring in Plots (install if missing)
+try
+    using Plots
+catch
+    import Pkg; Pkg.add("Plots"); using Plots
+end
+
+plt = plot(
+    ps, hob;
+    label = "Original channel",
+    xlabel = "Depolarizing probability p",
+    ylabel = "Hashing bound",
+    title = "Hashing bounds vs p",
+    marker = :circle,
+    linewidth = 2,
+)
+
+plot!(plt, ps, hib; label = "Induced channel", marker = :square, linewidth = 2)
+
+# Save figure (and print the path)
+outfile = "hashing_bounds_vs_p.png"
+savefig(plt, outfile)
+println("Saved plot to $(outfile)")

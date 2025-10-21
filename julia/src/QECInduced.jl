@@ -30,7 +30,6 @@ function H(p)
 end
 
 
-
 """
     tableau_from_stabilizers(S::AbstractMatrix{Bool})
 
