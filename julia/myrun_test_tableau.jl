@@ -8,7 +8,8 @@ include("src/Symplectic.jl")
 using QECInduced, .Symplectic
 
 
-Stabilizers = ["XZZXI", "IXZZX", "XIXZZ", "ZXIXZ"]
+#Stabilizers = ["XZZXI", "IXZZX", "XIXZZ", "ZXIXZ"]
+Stabilizers = ["ZZIZZIZZI", "IZZIZZIZZ", "IIIXXXXXX", "XXXXXXIII"]
 S = Symplectic.build_from_stabs(Stabilizers)
 @show S
 
@@ -34,20 +35,20 @@ H, Lx, Lz, G = QECInduced.tableau_from_stabilizers(S)
 @show Symplectic.sanity_check(H,Lx,Lz,G)
 
 # k should be 1 for the 5-qubit code
-@assert size(Lx, 1) == 1 && size(Lz, 1) == 1 "Expected k=1 logical qubit"
+# @assert size(Lx, 1) == 1 && size(Lz, 1) == 1 "Expected k=1 logical qubit"
 
 # Depolarizing channel with probability p
 p = 0.10
-# original depolar channel 
+# original depolarizing channel 
 pd = [1-p, p/3, p/3, p/3] 
 println("Hashing bound of original channel") 
-c = 1 - QECInduced.H(p) 
-@show c
+hashing_orig = 1 - QECInduced.H(pd) 
+@show hashing_orig
 # Call the public wrapper: it expects keyword `p::Float64`
-pbar, hashing = QECInduced.induced_channel_and_hashing_bound(H, Lx, Lz, G; p=p)
+pbar, hashing_induced = QECInduced.induced_channel_and_hashing_bound(H, Lx, Lz, G; p=p)
 
 @show size(pbar)
-@show hashing
+@show hashing_induced
 
-grid = QECInduced.sweep_depolarizing_grid(H, Lx, Lz, G; p_min=0.0, p_max=0.3, step=0.05, threads=4)
+grid = QECInduced.sweep_depolarizing_grid(H, Lx, Lz, G; p_min=0.0, p_max=0.3, step=0.01, threads=4)
 println("grid:\n", grid)
