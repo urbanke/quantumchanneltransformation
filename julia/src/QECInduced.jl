@@ -19,7 +19,7 @@ using .ParallelSweep
 
 
 
-function H(p::AbstractVector{<:Real})
+function H(p)
     s = 0.0
     @inbounds for v in p
         if v > 0

@@ -38,7 +38,11 @@ H, Lx, Lz, G = QECInduced.tableau_from_stabilizers(S)
 
 # Depolarizing channel with probability p
 p = 0.10
-
+# original depolar channel 
+pd = [1-p, p/3, p/3, p/3] 
+println("Hashing bound of original channel") 
+c = 1 - QECInduced.H(p) 
+@show c
 # Call the public wrapper: it expects keyword `p::Float64`
 pbar, hashing = QECInduced.induced_channel_and_hashing_bound(H, Lx, Lz, G; p=p)
 
