@@ -44,7 +44,7 @@ def stabilizers_full_repetition(m: int, ell: int):
 
 if __name__ == "__main__":
     # Shor [[9,1,3]]: m = 3 (within-block repetition), ell = 3 (across-block repetition)
-    m, ell = 3, 5
+    m, ell = 1, 1
     gens = stabilizers_full_repetition(m, ell)
 
     # Print literal Python list of strings (copy-paste ready)

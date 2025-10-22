@@ -175,6 +175,8 @@ def full_repetition_induced(p, m, ell):
     p_swapped_in  = swap_XZ(p_stage1)
     q             = T_X_m(p_swapped_in, ell)  # apply X-formula
     p_bar         = swap_XZ(q)                # swap back
+    #p_bar = p_stage1
+    print("Induced channel after X protection: ", p, normalize4(p_stage1))
     return normalize4(p_bar)
 
 
