@@ -8,9 +8,13 @@ include("src/Symplectic.jl")
 using QECInduced, .Symplectic
 
 
-#Stabilizers = ["XZZXI", "IXZZX", "XIXZZ", "ZXIXZ"]
-Stabilizers = ["ZZIIIIIII", "IZZIIIIII", "IIIZZIIII", "IIIIZZIII","IIIIIIZZI","IIIIIIIZZ","IIIXXXXXX","XXXXXXIII"]
-#Stabilizers = ["ZZIZZIZZI", "IZZIZZIZZ", "IIIXXXXXX", "XXXXXXIII"]
+#Stabilizers = ["XZZXI", "IXZZX", "XIXZZ", "ZXIXZ"] # 5-qubit repetition code
+#Stabilizers = ["ZZIIIIIII", "IZZIIIIII", "IIIZZIIII", "IIIIZZIII","IIIIIIZZI","IIIIIIIZZ","IIIXXXXXX","XXXXXXIII"] # 9-qubit Shor code
+#Stabilizers = ["ZZIZZIZZI", "IZZIZZIZZ", "IIIXXXXXX", "XXXXXXIII"]  # 9-qubit, rate 5/9, Bacon-Shor code
+#Stabilizers = ["XXI", "IXX"]  # 3-qubit repetition code 
+Stabilizers = ["ZZI", "IZZ"]  # 3-qubit repetition code 
+#Stabilizers = ["XXIII", "IXXII", "IIXXI", "IIIXX"] # 5-qubit repetition code
+
 S = Symplectic.build_from_stabs(Stabilizers)
 @show S
 
@@ -39,7 +43,7 @@ H, Lx, Lz, G = QECInduced.tableau_from_stabilizers(S)
 # @assert size(Lx, 1) == 1 && size(Lz, 1) == 1 "Expected k=1 logical qubit"
 
 # Depolarizing channel with probability p
-p = 0.10
+p = 0.3
 # original depolarizing channel 
 pd = [1-p, p/3, p/3, p/3] 
 println("Hashing bound of original channel") 
@@ -49,6 +53,7 @@ hashing_orig = 1 - QECInduced.H(pd)
 pbar, hashing_induced = QECInduced.induced_channel_and_hashing_bound(H, Lx, Lz, G; p=p)
 
 @show size(pbar)
+@show pbar
 @show hashing_induced
 
 grid = QECInduced.sweep_depolarizing_grid(H, Lx, Lz, G; p_min=0.0, p_max=0.5, step=0.01, threads=4)
