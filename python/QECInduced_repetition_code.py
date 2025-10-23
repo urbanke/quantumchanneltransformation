@@ -292,11 +292,11 @@ if __name__ == "__main__":
     ell = 3
 
     # Show a single p example for each channel family
-    p_example = 0.1
+    p_example = 0.06
     p_indep = pauli_channel_independent(p_example)
     p_depol = pauli_channel_depolarizing(p_example)
 
-    print("Single example at p = 0.1")
+    print("Single example at p = ", p_example)
     print("Independent channel p:", p_indep)
     pbar_indep = full_repetition_induced(p_indep, m, ell)
     print("Induced (indep) p̄:", pbar_indep)
@@ -310,4 +310,4 @@ if __name__ == "__main__":
     print("HB(induced,  depol) =", hashing_bound_induced(pbar_depol, m, ell))
 
     # Sweep and plot
-    sweep_and_plot(m=m, ell=ell, p_min=0.0, p_max=0.3, num=61)
+    #sweep_and_plot(m=m, ell=ell, p_min=0.0, p_max=0.3, num=61)
