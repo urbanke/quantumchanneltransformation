@@ -49,9 +49,13 @@ under the depolarizing channel with parameter `p`.
 Uses bit-packing and calls into the Rust kernel for speed.
 Returns `(pbar::Matrix{Float64}, hashing_bound::Float64)`.
 """
-function induced_channel_and_hashing_bound(H, Lx, Lz, G; p::Float64=0.1)
-    (pI, pX, pZ, pY) = (1-p, p/3, p/3, p/3)
-    Induced.induced_channel_and_hashing_bound(H, Lx, Lz, G, (pI, pX, pZ, pY))
+function induced_channel_and_hashing_bound(H, Lx, Lz, G, p_channel::AbstractVector{<:Real})
+    @assert length(p_channel) == 4 "expected p_channel = [pI, pX, pZ, pY]"
+    pI, pX, pZ, pY = p_channel
+    return Induced.induced_channel_and_hashing_bound(
+        H, Lx, Lz, G,
+        (float(pI), float(pX), float(pZ), float(pY))
+    )
 end
 
 """
