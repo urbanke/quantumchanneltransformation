@@ -14,7 +14,8 @@ Stabilizers = ["ZZIIIIIII", "IZZIIIIII", "IIIZZIIII", "IIIIZZIII","IIIIIIZZI","I
 #Stabilizers = ["XXI", "IXX"]  # 3-qubit repetition code 
 #Stabilizers = ["ZZI", "IZZ"]  # 3-qubit repetition code 
 #Stabilizers = ["XXIII", "IXXII", "IIXXI", "IIIXX"] # 5-qubit repetition code
-
+CHANNEL = "Independent" # Choose one 
+#CHANNEL = "Depolarizing"
 S = Symplectic.build_from_stabs(Stabilizers)
 @show S
 
@@ -44,11 +45,15 @@ H, Lx, Lz, G = QECInduced.tableau_from_stabilizers(S)
 
 # channel paramter
 p = 0.06
+if CHANNEL == "Depolarizing"
 # original depolarizing channel 
-#p_channel = [1-p, p/3, p/3, p/3]
-
+  p_channel = [1-p, p/3, p/3, p/3]
+else
 # original independent channel 
 p_channel = [(1-p)*(1-p), p*(1-p), p*(1-p), p*p]
+end 
+ 
+
 
 @show p
 @show p_channel
@@ -63,8 +68,12 @@ pbar, hashing_induced = QECInduced.induced_channel_and_hashing_bound(H, Lx, Lz, 
 @show pbar
 @show hashing_induced
 
-#grid = QECInduced.sweep_depolarizing_grid(H, Lx, Lz, G; p_min=0.0, p_max=0.5, step=0.01, threads=4)
-#println("grid:\n", grid)
+if CHANNEL == "Depolarizing"
+grid = QECInduced.sweep_depolarizing_grid(H, Lx, Lz, G; p_min=0.0, p_max=0.5, step=0.01, threads=4)
+else
+grid = QECInduced.sweep_independent_grid(H, Lx, Lz, G; p_min=0.0, p_max=0.5, step=0.01, threads=4)
+end
+println("grid:\n", grid)
 
 
 
@@ -73,30 +82,30 @@ pbar, hashing_induced = QECInduced.induced_channel_and_hashing_bound(H, Lx, Lz, 
 # -----------------------------
 # Data format: each row is [p, hashing_bound_original, hashing_bound_induced]
 
-#ps  = grid[:, 1]
-#hib = grid[:, 2]  # original hashing bound
-#hob =  grid[:, 3]  # induced hashing bound
+ps  = grid[:, 1]
+hib = grid[:, 2]  # original hashing bound
+hob =  grid[:, 3]  # induced hashing bound
 
 # Bring in Plots (install if missing)
-#try
-#    using Plots
-#catch
-#    import Pkg; Pkg.add("Plots"); using Plots
-#end
+try
+    using Plots
+catch
+    import Pkg; Pkg.add("Plots"); using Plots
+end
 
-#plt = plot(
-#    ps, hob;
-#    label = "Original channel",
-#    xlabel = "Depolarizing probability p",
-#    ylabel = "Hashing bound",
-#    title = "Hashing bounds vs p",
-#    marker = :circle,
-#    linewidth = 2,
-#)
+plt = plot(
+    ps, hob;
+    label = "Original channel",
+    xlabel = CHANNEL*" probability p",
+    ylabel = "Hashing bound",
+    title = "Hashing bounds vs p",
+    marker = :circle,
+    linewidth = 2,
+)
 
-#plot!(plt, ps, hib; label = "Induced channel", marker = :square, linewidth = 2)
+plot!(plt, ps, hib; label = "Induced channel", marker = :square, linewidth = 2)
 
 # Save figure (and print the path)
-#outfile = "hashing_bounds_vs_p.png"
-#savefig(plt, outfile)
-#println("Saved plot to $(outfile)")
+outfile = "hashing_bounds_vs_p.png"
+savefig(plt, outfile)
+println("Saved plot to $(outfile)")

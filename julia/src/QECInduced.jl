@@ -62,12 +62,22 @@ end
     sweep_depolarizing_grid(H, Lx, Lz, G; p_min=0.0, p_max=1.0, step=0.01, threads=Threads.nthreads())
 
 Parallel sweep of depolarizing parameter p in [p_min, p_max] with the given step.
-Returns a 2-column matrix `[p  hashing_bound]`.
+Returns a 3-column matrix `[p  induced_hashing_bound 1-h(p)]`.
 """
 sweep_depolarizing_grid(H, Lx, Lz, G; p_min=0.0, p_max=1.0, step=0.01, threads=Threads.nthreads()) =
     ParallelSweep.sweep_depolarizing_grid(H, Lx, Lz, G; p_min, p_max, step, threads)
 
 """
+    sweep_indepdent_grid(H, Lx, Lz, G; p_min=0.0, p_max=1.0, step=0.01, threads=Threads.nthreads())
+
+Parallel sweep of independent channel with parameter p in [p_min, p_max] with the given step.
+Returns a 2-column matrix `[p  induced_hashing_bound 1-h(p)]`.
+"""
+sweep_independent_grid(H, Lx, Lz, G; p_min=0.0, p_max=1.0, step=0.01, threads=Threads.nthreads()) =
+    ParallelSweep.sweep_independent_grid(H, Lx, Lz, G; p_min, p_max, step, threads)
+
+"""
+
     demo()
 
 Tiny demo: n=1, k=1 (no stabilizers). Shows single p and small sweep.

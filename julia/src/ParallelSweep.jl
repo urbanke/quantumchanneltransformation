@@ -40,5 +40,23 @@ function sweep_depolarizing_grid(H, Lx, Lz, G; p_min=0.0, p_max=1.0, step=0.01, 
     out
 end
 
+function sweep_independent_grid(H, Lx, Lz, G; p_min=0.0, p_max=1.0, step=0.01, threads::Int=nthreads())
+    ps = collect(range(p_min, p_max; step=step))
+    m = length(ps)
+    out = zeros(Float64, m, 3)
+    @threads for i in 1:m
+    p = ps[i]
+        pd = [(1-p)*(1-p), (1-p)*p,p*(1-p),p*p]
+        c = 1-H1(pd)
+    pbar, hb = Induced.induced_channel_and_hashing_bound(H, Lx, Lz, G, ((1-p)*(1-p), (1-p)*p, p*(1-p), p*p))
+    out[i,1] = p
+    out[i,2] = hb
+        out[i,3] = c
+    end
+    out
+end
+
+
+
 end # module
 
