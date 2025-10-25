@@ -84,6 +84,23 @@ function sanity_check(H::AbstractMatrix{Bool},Lx::AbstractMatrix{Bool},Lz::Abstr
     true
 end 
 
+
+
+function valid_code(S::AbstractMatrix{Bool})
+    m = size(S,1)
+    for i in 1:m
+        for j in i:m
+            if symp_inner(view(S,i,:), view(S,j,:)) 
+               return false  
+            end
+        end
+    end
+    return true
+end 
+
+
+
+
 function build_from_stabs(StabString::Vector{String}) #  
     k = size(StabString,1)
     n = length(StabString[1])
