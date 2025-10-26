@@ -5,6 +5,7 @@
 
 include("src/Symplectic.jl")
 
+
 using QECInduced, .Symplectic
 
 
@@ -16,7 +17,8 @@ Stabilizers = ["ZZIIIIIII", "IZZIIIIII", "IIIZZIIII", "IIIIZZIII","IIIIIIZZI","I
 #Stabilizers = ["XXIII", "IXXII", "IIXXI", "IIIXX"] # 5-qubit repetition code
 CHANNEL = "Independent" # Choose one 
 #CHANNEL = "Depolarizing"
-S = Symplectic.build_from_stabs(Stabilizers)
+#S = Symplectic.build_from_stabs(Stabilizers)
+S = Bool[0 0 0 1 0 0 0 0 0 0; 0 0 1 0 0 0 0 0 0 0; 0 1 0 0 0 0 0 0 0 0; 1 0 0 0 0 0 0 0 0 0]
 @show S
 
 
@@ -44,7 +46,8 @@ H, Lx, Lz, G = QECInduced.tableau_from_stabilizers(S)
 # @assert size(Lx, 1) == 1 && size(Lz, 1) == 1 "Expected k=1 logical qubit"
 
 # channel paramter
-p = 0.06
+#p = 0.11002786457538605
+p = 0.11002786443835955
 if CHANNEL == "Depolarizing"
 # original depolarizing channel 
   p_channel = [1-p, p/3, p/3, p/3]

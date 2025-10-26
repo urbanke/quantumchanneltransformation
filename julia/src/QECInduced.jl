@@ -4,7 +4,9 @@ export tableau_from_stabilizers,
        induced_channel_and_hashing_bound,
        sweep_depolarizing_grid,
        demo, 
-       check_induced_channel
+       check_induced_channel, 
+       findZeroRate,
+       f
 
 include("Symplectic.jl")
 include("SGS.jl")
@@ -20,6 +22,40 @@ using .ParallelSweep
 
 
 
+function findZeroRate(f, a, b; tol=1e-16, maxiter=1000, ChannelType = "Independent")
+    fa, fb = f(a; ChannelType = ChannelType), f(b; ChannelType = ChannelType)
+    if fa * fb > 0
+        error("f(a) and f(b) must have opposite signs")
+    end
+
+    for i in 1:maxiter
+        c = (a + b) / 2
+        fc = f(c; ChannelType = ChannelType)
+
+        if abs(fc) < tol || (b - a)/2 < tol
+            return c  # found root
+        end
+
+        if fa * fc < 0
+            b, fb = c, fc
+        else
+            a, fa = c, fc
+        end
+    end
+
+    return (a + b) / 2  # best estimate after maxiter
+end
+
+function f(p; ChannelType = "Independent")
+    if ChannelType == "Depolarizing"
+        pc = [1-p, p/3,p/3,p/3]
+    else 
+        pc = [(1-p)*(1-p), p*(1-p), p*(1-p),p*p]
+    end
+    return 1 - H(pc)
+end
+
+
 function H(p)
     s = 0.0
     @inbounds for v in p
@@ -29,6 +65,7 @@ function H(p)
     end
     return s
 end
+
 
 
 """
@@ -92,23 +129,23 @@ function check_induced_channel(S; ChannelType = "Independent")
 # check that each of H, Lx, Lz, G commute within themselves
     @assert(Symplectic.sanity_check(H,Lx,Lz,G) == true, "Error Constructing Tableau")
 
-
+    pz = findZeroRate(f, 0, .5; maxiter=15000, ChannelType = ChannelType)
     if ChannelType == "Depolarizing"
-        grid = QECInduced.sweep_depolarizing_grid(H, Lx, Lz, G; p_min=0.0, p_max=0.5, step=0.01, threads=4)
+        pbar, hb = Induced.induced_channel_and_hashing_bound(H, Lx, Lz, G, ((1-pz), pz/3, pz/3, pz/3))
+#        grid = QECInduced.sweep_depolarizing_grid(H, Lx, Lz, G; p_min=0.0, p_max=0.5, step=step, threads=4)
     else
-        grid = QECInduced.sweep_independent_grid(H, Lx, Lz, G; p_min=0.0, p_max=0.5, step=0.01, threads=4)
+        pbar, hb = Induced.induced_channel_and_hashing_bound(H, Lx, Lz, G, ((1-pz)*(1-pz), (1-pz)*pz, pz*(1-pz), pz*pz))
+#        grid = QECInduced.sweep_independent_grid(H, Lx, Lz, G; p_min=0.0, p_max=0.5, step=step, threads=4)
     end
+    #@show grid 
 
-    ps  = grid[:, 1]
-    hib = grid[:, 2]  # original hashing bound
-    hob =  grid[:, 3]  # induced hashing bound
+    #ps  = grid[:, 1]
+    #hib = grid[:, 2]  # original hashing bound
+    #hob =  grid[:, 3]  # induced hashing bound
 
-    good_hib = (hib .> hob) .& (hib .> 0) # this is checking that it is both beating the original channel and also non-zero
+    #good_hib = (hb > 0) # this is checking that it is both beating the original channel and also non-zero
 
-    if sum(good_hib) .> 0 # if there is at least one of these 
-        return true
-    end
-    return false
+    return hb
 end  
 
 

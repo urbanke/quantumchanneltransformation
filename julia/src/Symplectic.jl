@@ -1,5 +1,4 @@
 module Symplectic
-
 export symp_inner, check_commutes, Jmul, xorrows
 
 """

@@ -4,35 +4,36 @@
 #  - Z on qubit i -> u_i = 0, v_i = 1
 
 include("src/Symplectic.jl")
+include("src/SGS.jl")
+
+using QECInduced, .Symplectic, .SGS
 
 
-using QECInduced, .Symplectic
-
-function dec2bin(int; n = 8) 
-    quot = int 
-    rem = 1 
-    seq = zeros((1,n))
-    i = 0 
-    while(quot != 0)
-        rem = quot%2 
-        quot = div(quot,2)
-        seq[n-i] = rem 
-        i += 1 
-    end
-    return seq
-end 
 
 
 function TestAllNK(n,r) #  
-    S = falses(r, 2*n)  # r = n-k stabilizers, 2n columns   
+    pz = findZeroRate(f, 0, .5;maxiter=1000, ChannelType = "Independent")
+    S_best = falses(r, 2*n)  # r = n-k stabilizers, 2n columns   
     totalBits = 2*n*r # it will be r rows of 2n each 
-    for bits in 0:(2^totalBits-1)
-        s = dec2bin(bits; n = totalBits)
-        S = Matrix{Bool}(reshape(s,r,2*n))
-        if Symplectic.valid_code(S)
-            if QECInduced.check_induced_channel(S)
-                println(S)
+    j = 0 
+    hb_best = -10
+    for bits in Iterators.product(fill(0:1, r*n*2)...)
+        S = Matrix{Bool}(reshape(collect(bits),r,2*n))
+        if SGS.rank_f2(S) == r
+            if Symplectic.valid_code(S)
+                hb_temp = QECInduced.check_induced_channel(S)
+                if hb_temp > hb_best
+                    hb_best = hb_temp
+                    S_best = S 
+                end
             end
+        end
+        j += 1 
+        if j % 5000 == 0 
+            println(j)
+            println(pz)
+            println(hb_best)
+            println(S_best)
         end
     end
 end
@@ -40,10 +41,4 @@ end
 
 TestAllNK(5,4)
 
-
-
-
-
-
-end  
 
