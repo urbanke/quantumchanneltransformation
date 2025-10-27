@@ -9,16 +9,18 @@ include("src/Symplectic.jl")
 using QECInduced, .Symplectic
 
 
-#Stabilizers = ["XZZXI", "IXZZX", "XIXZZ", "ZXIXZ"] # 5-qubit repetition code
-Stabilizers = ["ZZIIIIIII", "IZZIIIIII", "IIIZZIIII", "IIIIZZIII","IIIIIIZZI","IIIIIIIZZ","IIIXXXXXX","XXXXXXIII"] # 9-qubit Shor code
+Stabilizers = ["XZZXI", "IXZZX", "XIXZZ", "ZXIXZ"] # 5-qubit repetition code
+#Stabilizers = ["ZZIIIIIII", "IZZIIIIII", "IIIZZIIII", "IIIIZZIII","IIIIIIZZI","IIIIIIIZZ","IIIXXXXXX","XXXXXXIII"] # 9-qubit Shor code
 #Stabilizers = ["ZZIZZIZZI", "IZZIZZIZZ", "IIIXXXXXX", "XXXXXXIII"]  # 9-qubit, rate 5/9, Bacon-Shor code
 #Stabilizers = ["XXI", "IXX"]  # 3-qubit repetition code 
 #Stabilizers = ["ZZI", "IZZ"]  # 3-qubit repetition code 
 #Stabilizers = ["XXIII", "IXXII", "IIXXI", "IIIXX"] # 5-qubit repetition code
-CHANNEL = "Independent" # Choose one 
-#CHANNEL = "Depolarizing"
-#S = Symplectic.build_from_stabs(Stabilizers)
-S = Bool[0 0 0 1 0 0 0 0 0 0; 0 0 1 0 0 0 0 0 0 0; 0 1 0 0 0 0 0 0 0 0; 1 0 0 0 0 0 0 0 0 0]
+#Stabilizers = ["IYIIX", "IIIIX"] #
+
+#CHANNEL = "Independent" # Choose one 
+CHANNEL = "Depolarizing"
+S = Symplectic.build_from_stabs(Stabilizers)
+#S = Bool[0 0 0 1 0 0 0 0 0 0; 0 0 1 0 0 0 0 0 0 0; 0 1 0 0 0 0 0 0 0 0; 1 0 0 0 0 0 0 0 0 0]
 @show S
 
 
@@ -47,7 +49,9 @@ H, Lx, Lz, G = QECInduced.tableau_from_stabilizers(S)
 
 # channel paramter
 #p = 0.11002786457538605
-p = 0.11002786443835955
+p = 0.1892896249152317
+println(typeof(p) === Float32)  # true
+println(typeof(p) === Float64)
 if CHANNEL == "Depolarizing"
 # original depolarizing channel 
   p_channel = [1-p, p/3, p/3, p/3]
@@ -86,7 +90,7 @@ println("grid:\n", grid)
 # Data format: each row is [p, hashing_bound_original, hashing_bound_induced]
 
 ps  = grid[:, 1]
-hib = grid[:, 2]  # original hashing bound
+hib = 5/3*grid[:, 2]  # original hashing bound
 hob =  grid[:, 3]  # induced hashing bound
 
 # Bring in Plots (install if missing)

@@ -21,4 +21,4 @@ Thumbs.db
 
 
 # --- images ---
-julia/*.png
+/julia/*.png

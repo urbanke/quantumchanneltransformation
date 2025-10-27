@@ -12,7 +12,7 @@ using QECInduced, .Symplectic, .SGS
 
 
 function TestAllNK(n,r) #  
-    pz = findZeroRate(f, 0, .5;maxiter=1000, ChannelType = "Independent")
+    pz = findZeroRate(f, 0, .5;maxiter=1000, ChannelType = "Depolarizing")
     S_best = falses(r, 2*n)  # r = n-k stabilizers, 2n columns   
     totalBits = 2*n*r # it will be r rows of 2n each 
     j = 0 
@@ -22,14 +22,14 @@ function TestAllNK(n,r) #
         if SGS.rank_f2(S) == r
             if Symplectic.valid_code(S)
                 hb_temp = QECInduced.check_induced_channel(S)
-                if hb_temp > hb_best
+                if hb_temp >= hb_best
                     hb_best = hb_temp
                     S_best = S 
                 end
             end
         end
         j += 1 
-        if j % 5000 == 0 
+        if j % 100000 == 0 
             println(j)
             println(pz)
             println(hb_best)
@@ -39,6 +39,6 @@ function TestAllNK(n,r) #
 end
 
 
-TestAllNK(5,4)
+TestAllNK(6,5)
 
 
