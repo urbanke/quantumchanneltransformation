@@ -98,6 +98,30 @@ function valid_code(S::AbstractMatrix{Bool})
 end 
 
 
+function build_from_bits(S::AbstractMatrix{Bool})
+    k = size(S,1)
+    n = div(size(S,2),2) 
+    Xs = S[:,1:n]
+    Zs = S[:,n+1:(2*n)]
+    StabString = [] 
+    for i in 1:k 
+        tempString = ""
+        for j in 1:n 
+            if Xs[i,j] & Zs[i,j]
+                tempString = tempString*"Y" 
+            elseif Xs[i,j] 
+                tempString = tempString*"X" 
+            elseif Zs[i,j] 
+                tempString = tempString*"Z" 
+            else 
+                tempString = tempString*"I" 
+            end
+        end
+        println(tempString)
+        push!(StabString, tempString)
+    end 
+    return StabString
+end
 
 
 function build_from_stabs(StabString::Vector{String}) #  
@@ -117,7 +141,6 @@ function build_from_stabs(StabString::Vector{String}) #
                 S[i,j+n] = true 
             end 
         end
-        println()
     end
     return S
 end

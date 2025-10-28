@@ -82,7 +82,7 @@ function TestAllNK_scrambled(n::Int, r::Int)
     S_best  = falses(r, 2n)  # BitMatrix is fine here
 
     # whatever this is in your codebase
-    pz = findZeroRate(f, 0, 0.5; maxiter=1000, ChannelType="Depolarizing")
+    pz = findZeroRate(f, 0, 0.5; maxiter=1000, ChannelType="Independent")
 
     j = 0
 
@@ -106,7 +106,7 @@ function TestAllNK_scrambled(n::Int, r::Int)
         if SGS.rank_f2(S) == r
             # commutation / valid stabilizer check
             if Symplectic.valid_code(S)
-                hb_temp = QECInduced.check_induced_channel(S)
+                hb_temp = QECInduced.check_induced_channel(S,pz)
                 if hb_temp >= hb_best
                     hb_best = hb_temp
                     S_best  = copy(S)

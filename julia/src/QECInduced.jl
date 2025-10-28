@@ -122,14 +122,13 @@ sweep_independent_grid(H, Lx, Lz, G; p_min=0.0, p_max=1.0, step=0.01, threads=Th
 Takes in a list of stabilizers, as well as the ChannelType (currently only Depolarizing or Independent). If there is a moment where the induced channel is both better than 0 AND H(p_channel), it returns true
 Stabilizer must be in boolean form not XYZ form. 
 """
-function check_induced_channel(S; ChannelType = "Independent")
+function check_induced_channel(S, pz; ChannelType = "Independent")
 # Build tableau/logicals
     H, Lx, Lz, G = QECInduced.tableau_from_stabilizers(S)
 
 # check that each of H, Lx, Lz, G commute within themselves
     @assert(Symplectic.sanity_check(H,Lx,Lz,G) == true, "Error Constructing Tableau")
 
-    pz = findZeroRate(f, 0, .5; maxiter=15000, ChannelType = ChannelType)
     if ChannelType == "Depolarizing"
         pbar, hb = Induced.induced_channel_and_hashing_bound(H, Lx, Lz, G, ((1-pz), pz/3, pz/3, pz/3))
 #        grid = QECInduced.sweep_depolarizing_grid(H, Lx, Lz, G; p_min=0.0, p_max=0.5, step=step, threads=4)
@@ -137,14 +136,6 @@ function check_induced_channel(S; ChannelType = "Independent")
         pbar, hb = Induced.induced_channel_and_hashing_bound(H, Lx, Lz, G, ((1-pz)*(1-pz), (1-pz)*pz, pz*(1-pz), pz*pz))
 #        grid = QECInduced.sweep_independent_grid(H, Lx, Lz, G; p_min=0.0, p_max=0.5, step=step, threads=4)
     end
-    #@show grid 
-
-    #ps  = grid[:, 1]
-    #hib = grid[:, 2]  # original hashing bound
-    #hob =  grid[:, 3]  # induced hashing bound
-
-    #good_hib = (hb > 0) # this is checking that it is both beating the original channel and also non-zero
-
     return hb
 end  
 
