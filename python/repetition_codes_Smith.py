@@ -78,6 +78,7 @@ def conditional_logical_given_r(r, k, pI, pX, pZ, pY):
         for v in (0, 1):
             J[u, v] = joint_one_pattern_smith(u, v, r, k, pI, pX, pZ, pY)
     Z = J.sum()
+    #print("Z:= ", Z)
     if Z <= 0:
         # Numerically degenerate; return uniform to avoid NaNs
         return np.full((2, 2), 0.25, dtype=float)
@@ -92,8 +93,10 @@ def induced_hashing_bound_repetition(k, pI, pX, pZ, pY):
     """
     # P(r) (including multiplicity) for r=0..k-1
     Pr = np.array([syndrome_weight_mass(r, k, pI, pX, pZ, pY) for r in range(k)], dtype=float)
-    Pr = np.clip(Pr, 0.0, None)
+    #Pr = np.clip(Pr, 0.0, None)
     S = Pr.sum()
+    #print("S:= ", S)
+    #assert S == 1.0, "Pr(r) sums to 1"
     if S > 0:
         Pr /= S
     else:
@@ -103,7 +106,7 @@ def induced_hashing_bound_repetition(k, pI, pX, pZ, pY):
     hashing_r = np.zeros(k, dtype=float)
     for r in range(k):
         pbar = conditional_logical_given_r(r, k, pI, pX, pZ, pY)  # 2x2 over (u,v)
-        hashing_r[r] = 1.0 - H_base2(pbar.flatten())
+        hashing_r[r] = (1.0 - H_base2(pbar.flatten()))/k #max(0.0,(1.0 - H_base2(pbar.flatten()))/k)
 
     hashing_induced = float(np.dot(Pr, hashing_r))
     return hashing_induced, Pr, hashing_r
@@ -113,48 +116,50 @@ def induced_hashing_bound_repetition(k, pI, pX, pZ, pY):
 # =========================
 if __name__ == "__main__":
     # Repetition code length
-    k = 7  
-
-    # Sweep x (X-flip prob). 
-    x_grid = np.linspace(0.2, 0.3, 200)
-
-    orig_vals = []
-    ind_vals = []
-
-    for x in x_grid:
-        # Independent channel with skew z = x/9
-        (pI, pX, pZ, pY), _ = pauli_probs_independent(x)
-
-        # Raw hashing bound
-        hashing_orig = 1.0 - H_base2([pI, pX, pY, pZ])
-
-        # Induced hashing bound for repetition code (Smith)
-        hashing_ind, Pr, hashing_r = induced_hashing_bound_repetition(k, pI, pX, pZ, pY)
-
-        orig_vals.append(hashing_orig)
-        ind_vals.append(hashing_ind)
-
-    orig_vals = np.array(orig_vals, dtype=float)
-    ind_vals = np.array(ind_vals, dtype=float)
-
-    # Plot both vs x
     plt.figure()
-    plt.plot(x_grid, orig_vals, label="Original hashing bound (indep., z=x/9)")
-    plt.plot(x_grid, ind_vals, label=f"Induced hashing bound (repetition k={k})")
-    plt.xlabel("x  (X-flip probability)")
-    plt.ylabel("Hashing bound (bits per qubit)")
-    plt.title("Induced vs Original Hashing Bound (independent channel, z = x/9)")
-    plt.grid(True)
-    plt.legend()
-    plt.tight_layout()
-    plt.show()
+    for k in range(3,34):  
 
-    # Optional: quick text sanity for a few x
-    for x_test in [0.01, 0.03, 0.05]:
-        (pI, pX, pZ, pY), perr = pauli_probs_independent(x_test)
-        hashing_orig = 1.0 - H_base2([pI, pX, pY, pZ])
-        hashing_ind, Pr, hashing_r = induced_hashing_bound_repetition(k, pI, pX, pZ, pY)
-        print(f"\nx={x_test:.3f}, z={x_test/9:.5f}")
-        print(f"pI={pI:.6f}, pX={pX:.6f}, pY={pY:.6f}, pZ={pZ:.6f}, perr={perr:.6f}")
-        print(f"Original bound:     {hashing_orig:.6f}")
-        print(f"Induced bound: {hashing_ind:.6f}")
+        # Sweep x (X-flip prob). 
+        x_grid = np.linspace(0.2, 0.3, 200)
+    
+        orig_vals = []
+        ind_vals = []
+        perr = []
+    
+        for x in x_grid:
+            # Independent channel with skew z = x/9
+            (pI, pX, pZ, pY), p = pauli_probs_independent(x)
+            perr.append(p)
+    
+            # Raw hashing bound
+            hashing_orig = 1.0 - H_base2([pI, pX, pY, pZ])
+    
+            # Induced hashing bound for repetition code (Smith)
+            hashing_ind, Pr, hashing_r = induced_hashing_bound_repetition(k, pI, pX, pZ, pY)
+    
+            orig_vals.append(hashing_orig)
+            ind_vals.append(hashing_ind)
+    
+        orig_vals = np.array(orig_vals, dtype=float)
+        ind_vals = np.array(ind_vals, dtype=float)
+    
+        # Plot both vs x
+        plt.plot(perr, orig_vals, label="Original hashing bound (indep., z=x/9)")
+        plt.plot(perr, ind_vals, label=f"Induced hashing bound (repetition k={k})")
+        plt.xlabel("x  (X-flip probability)")
+        plt.ylabel("Hashing bound (bits per qubit)")
+        plt.title("Induced vs Original Hashing Bound (independent channel, z = x/9)")
+        plt.grid(True)
+        #plt.legend()
+        plt.tight_layout()
+        plt.show()
+    
+        # Optional: quick text sanity for a few x
+        # for x_test in [0.255]:
+        #     (pI, pX, pZ, pY), perr = pauli_probs_independent(x_test)
+        #     hashing_orig = 1.0 - H_base2([pI, pX, pY, pZ])
+        #     hashing_ind, Pr, hashing_r = induced_hashing_bound_repetition(k, pI, pX, pZ, pY)
+        #     print(f"\nx={x_test:.3f}, z={x_test/9:.5f}")
+        #     print(f"pI={pI:.6f}, pX={pX:.6f}, pY={pY:.6f}, pZ={pZ:.6f}, perr={perr:.6f}")
+        #     print(f"Original bound:     {hashing_orig:.6f}")
+        #     print(f"Induced bound: {hashing_ind:.6f}")
