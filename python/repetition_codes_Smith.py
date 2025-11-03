@@ -106,7 +106,7 @@ def induced_hashing_bound_repetition(k, pI, pX, pZ, pY):
     hashing_r = np.zeros(k, dtype=float)
     for r in range(k):
         pbar = conditional_logical_given_r(r, k, pI, pX, pZ, pY)  # 2x2 over (u,v)
-        hashing_r[r] = (1.0 - H_base2(pbar.flatten()))/k #max(0.0,(1.0 - H_base2(pbar.flatten()))/k)
+        hashing_r[r] = max(0,(1.0 - H_base2(pbar.flatten()))/k) #(1.0 - H_base2(pbar.flatten()))/k
 
     hashing_induced = float(np.dot(Pr, hashing_r))
     return hashing_induced, Pr, hashing_r
@@ -120,7 +120,7 @@ if __name__ == "__main__":
     for k in range(3,34):  
 
         # Sweep x (X-flip prob). 
-        x_grid = np.linspace(0.2, 0.3, 200)
+        x_grid = np.linspace(0.2, 0.5, 200)
     
         orig_vals = []
         ind_vals = []
