@@ -5,28 +5,28 @@
 
 include("src/Symplectic.jl")
 
-
 using QECInduced, .Symplectic
 
+# Choose a code (default: 5-qubit perfect code)
+# Stabilizers = ["XZZXI", "IXZZX", "XIXZZ", "ZXIXZ"]
+# Other options you sometimes toggle:
+# Stabilizers = ["ZZIIIIIII", "IZZIIIIII", "IIIZZIIII", "IIIIZZIII","IIIIIIZZI","IIIIIIIZZ","IIIXXXXXX","XXXXXXIII"] # 9-qubit Shor
+# Stabilizers = ["ZZIZZIZZI", "IZZIZZIZZ", "IIIXXXXXX", "XXXXXXIII"]  # 9-qubit, rate 5/9, Bacon-Shor
+# Stabilizers = ["XXI", "IXX"]  # 3-qubit repetition
+# Stabilizers = ["ZZI", "IZZ"]  # 3-qubit repetition
+# Stabilizers = ["XXIII", "IXXII", "IIXXI", "IIIXX"] # alt 5-qubit repetition flavor
+# Stabilizers = ["IYIIX", "IIIIX"]
+# Stabilizers = ["ZZIII", "ZIZII","ZIIZI", "ZIIIZ"]
+Stabilizers = ["ZZIIIII", "ZIZIIII","ZIIZIII", "ZIIIZII", "ZIIIIZI", "ZIIIIIZ"]
 
-Stabilizers = ["XZZXI", "IXZZX", "XIXZZ", "ZXIXZ"] # 5-qubit repetition code
-#Stabilizers = ["ZZIIIIIII", "IZZIIIIII", "IIIZZIIII", "IIIIZZIII","IIIIIIZZI","IIIIIIIZZ","IIIXXXXXX","XXXXXXIII"] # 9-qubit Shor code
-#Stabilizers = ["ZZIZZIZZI", "IZZIZZIZZ", "IIIXXXXXX", "XXXXXXIII"]  # 9-qubit, rate 5/9, Bacon-Shor code
-#Stabilizers = ["XXI", "IXX"]  # 3-qubit repetition code 
-#Stabilizers = ["ZZI", "IZZ"]  # 3-qubit repetition code 
-#Stabilizers = ["XXIII", "IXXII", "IIXXI", "IIIXX"] # 5-qubit repetition code
-#Stabilizers = ["IYIIX", "IIIIX"] #
+CHANNEL = "Independent"
+#CHANNEL = "Depolarizing"
 
-#CHANNEL = "Independent" # Choose one 
-CHANNEL = "Depolarizing"
 S = Symplectic.build_from_stabs(Stabilizers)
-#S = Bool[0 0 0 1 0 0 0 0 0 0; 0 0 1 0 0 0 0 0 0 0; 0 1 0 0 0 0 0 0 0 0; 1 0 0 0 0 0 0 0 0 0]
 @show S
-
 
 # Ensure it's a plain Bool matrix
 S = Matrix{Bool}(S)
-
 
 # Build tableau/logicals
 H, Lx, Lz, G = QECInduced.tableau_from_stabilizers(S)
@@ -42,56 +42,51 @@ H, Lx, Lz, G = QECInduced.tableau_from_stabilizers(S)
 @show G
 
 # check that each of H, Lx, Lz, G commute within themselves
-@show Symplectic.sanity_check(H,Lx,Lz,G)
+@show Symplectic.sanity_check(H, Lx, Lz, G)
 
-# k should be 1 for the 5-qubit code
-# @assert size(Lx, 1) == 1 && size(Lz, 1) == 1 "Expected k=1 logical qubit"
+# Channel parameter
+px = 0.26
+pz = px/9.0
+@show px,pz
 
-# channel paramter
-#p = 0.11002786457538605
-p = 0.1892896249152317
-println(typeof(p) === Float32)  # true
-println(typeof(p) === Float64)
+# Single-qubit Pauli channel tuple (pI, pX, pZ, pY)
 if CHANNEL == "Depolarizing"
-# original depolarizing channel 
-  p_channel = [1-p, p/3, p/3, p/3]
+    # Depolarizing: [1-p, p/3, p/3, p/3]
+    p_channel = [1 - p, p/3, p/3, p/3]
 else
-# original independent channel 
-p_channel = [(1-p)*(1-p), p*(1-p), p*(1-p), p*p]
-end 
- 
+    # Independent X/Z flips: [(1-p)^2, p(1-p), p(1-p), p^2]
+    p_channel = [(1 - px) * (1 - pz), px * (1 - pz), pz * (1 - px), px * pz]
+end
 
-
-@show p
 @show p_channel
 
-println("Hashing bound of original channel") 
-hashing_orig = 1 - QECInduced.H(p_channel) 
+println("\nHashing bound of the ORIGINAL physical channel (per-qubit):")
+hashing_orig = 1 - QECInduced.H(p_channel)
 @show hashing_orig
-# Call the public wrapper: it expects keyword `p::Float64`
-pbar, hashing_induced = QECInduced.induced_channel_and_hashing_bound(H, Lx, Lz, G, p_channel)
 
+println("\nComputing induced-channel distribution and per-syndrome hashing bound (new definition):")
+pbar, hashing_induced = QECInduced.induced_channel_and_hashing_bound(H, Lx, Lz, G, p_channel)
 @show size(pbar)
 @show pbar
+println("Induced (per-syndrome) hashing bound returned by kernel: (k - Σ_s p(s) H(p(a',b'|s)))/n")
 @show hashing_induced
 
+# Grids (p vs bounds) — uses the same public sweep helpers.
 if CHANNEL == "Depolarizing"
-grid = QECInduced.sweep_depolarizing_grid(H, Lx, Lz, G; p_min=0.0, p_max=0.5, step=0.01, threads=4)
+    grid = QECInduced.sweep_depolarizing_grid(H, Lx, Lz, G; p_min = 0.0, p_max = 0.5, step = 0.01, threads = 4)
 else
-grid = QECInduced.sweep_independent_grid(H, Lx, Lz, G; p_min=0.0, p_max=0.5, step=0.01, threads=4)
+    grid = QECInduced.sweep_independent_grid(H, Lx, Lz, G; p_min = 0.0, p_max = 0.5, step = 0.01, threads = 4)
 end
+
+println("\nGrid columns are assumed as [p, hashing_bound_original, hashing_bound_induced]:")
 println("grid:\n", grid)
 
-
-
 # -----------------------------
-# Plot the (p, hashing_orig, hashing_induced) triplets you provided
+# Plot (p, original per-qubit bound, induced per-syndrome bound)
 # -----------------------------
-# Data format: each row is [p, hashing_bound_original, hashing_bound_induced]
-
-ps  = grid[:, 1]
-hib = 5/3*grid[:, 2]  # original hashing bound
-hob =  grid[:, 3]  # induced hashing bound
+ps      = grid[:, 1]
+origHB  = grid[:, 2]  # 1 - H(p_channel) per qubit
+indHB   = grid[:, 3]  # (k - Σ_s p(s) H(· | s))/n from the updated kernel
 
 # Bring in Plots (install if missing)
 try
@@ -101,18 +96,19 @@ catch
 end
 
 plt = plot(
-    ps, hob;
-    label = "Original channel",
-    xlabel = CHANNEL*" probability p",
+    ps, origHB;
+    label = "Original channel (per-qubit 1 - H(p))",
+    xlabel = CHANNEL * " probability p",
     ylabel = "Hashing bound",
     title = "Hashing bounds vs p",
     marker = :circle,
     linewidth = 2,
 )
 
-plot!(plt, ps, hib; label = "Induced channel", marker = :square, linewidth = 2)
+plot!(plt, ps, indHB; label = "Induced (per-syndrome conditional entropy)", marker = :square, linewidth = 2)
 
 # Save figure (and print the path)
 outfile = "hashing_bounds_vs_p.png"
 savefig(plt, outfile)
 println("Saved plot to $(outfile)")
+

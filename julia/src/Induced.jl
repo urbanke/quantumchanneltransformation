@@ -13,14 +13,20 @@ const DEFAULT_RUST_LIB = get(ENV, "QEC_RUST_LIB",
 """
     induced_channel_and_hashing_bound(H, Lx, Lz, G, p_tuple) -> (pbar, hashing_bound)
 
-Compute induced p̄(a′,b′) and hashing bound under an i.i.d. Pauli channel with
-single-qubit probabilities p_tuple = (pI,pX,pZ,pY). Fast path:
-- bit-pack all precomputed spans:
-  Ttab = span(H) over t ∈ {0,1}^r,
-  AL   = span(Lx) over a ∈ {0,1}^k,
-  BL   = span(Lz) over b ∈ {0,1}^k,
-  SG   = span(G)  over s ∈ {0,1}^r,
-- call Rust `compute_pbar_and_hashing_bound` to do heavy inner loops + argmax + accumulation.
+Compute the ML-centered induced distribution and the **per-syndrome hashing bound** under an i.i.d.
+Pauli channel with single-qubit probabilities `p_tuple = (pI,pX,pZ,pY)`.
+
+Definitions:
+  • For each syndrome s, compute Pₛ(a,b) = ∑ₜ P_chan(E(t,a,b,s)).
+  • Let (a*(s), b*(s)) be the ML pair for s, and define a′=a⊻a*(s), b′=b⊻b*(s).
+  • p̄(a′,b′ | s) = Pₛ(a′⊻a*(s), b′⊻b*(s)) / p̄(s), with p̄(s)=∑_{a′,b′} Pₛ(…).
+  • H̄ = ∑ₛ p̄(s)·H( p̄(a′,b′ | s) ).
+
+Return values:
+  • `pbar::Matrix{Float64}`: ML-centered *marginal* over (a′,b′), normalized over all s.
+  • `hashing_bound::Float64`: (k - H̄)/n  (note: **conditional-entropy** form).
+
+The Rust kernel computes H̄ directly; the ABI and allocation shape are unchanged.
 """
 function induced_channel_and_hashing_bound(H::AbstractMatrix{Bool},
                                            Lx::AbstractMatrix{Bool},
@@ -33,25 +39,21 @@ function induced_channel_and_hashing_bound(H::AbstractMatrix{Bool},
     k = size(Lx,1)
     S = 1 << r
     A = 1 << k
+
     # bit-pack bases
     HU, HV, _ = Bitpack.to_bitpacked_uv(H)
     GU, GV, _ = Bitpack.to_bitpacked_uv(G)
     LxU, LxV, _ = Bitpack.to_bitpacked_uv(Lx)
     LzU, LzV, _ = Bitpack.to_bitpacked_uv(Lz)
-    W = size(HU,2)
 
     # patterns
     patt_r = falses(S, r)
-    for i in 0:S-1
-        for b in 1:r
-            patt_r[i+1, r-b+1] = isodd((i >> (b-1)) & 0x1)
-        end
+    for i in 0:S-1, b in 1:r
+        patt_r[i+1, r-b+1] = isodd((i >> (b-1)) & 0x1)
     end
     patt_k = falses(A, k)
-    for i in 0:A-1
-        for b in 1:k
-            patt_k[i+1, k-b+1] = isodd((i >> (b-1)) & 0x1)
-        end
+    for i in 0:A-1, b in 1:k
+        patt_k[i+1, k-b+1] = isodd((i >> (b-1)) & 0x1)
     end
 
     # precompute bitpacked spans (vectorized over t,a,b,s)
@@ -67,9 +69,9 @@ function induced_channel_and_hashing_bound(H::AbstractMatrix{Bool},
     # Prepare output pbar
     pbar = zeros(Float64, A, A)
 
-    # ccall into Rust — must use compile-time-constant library expression
     @assert isfile(DEFAULT_RUST_LIB) "Rust library not found at: $(DEFAULT_RUST_LIB). Set QEC_RUST_LIB if needed."
 
+    # NOTE: return now uses H̄ (per-syndrome conditional entropy), not H(p̄(a′,b′)).
     hashing_bound = ccall((:compute_pbar_and_hashing_bound, DEFAULT_RUST_LIB), Float64,
         ( Ptr{UInt64}, Ptr{UInt64}, Csize_t, Csize_t,
           Ptr{UInt64}, Ptr{UInt64}, Csize_t,

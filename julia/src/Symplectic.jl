@@ -133,7 +133,7 @@ function build_from_stabs(StabString::Vector{String}) #
         stab = StabString[i]
         for j in 1:n
             s = stab[j]
-            print(s)
+            #print(s)
             if s == 'X' || s == 'Y'
                 S[i,j] = true 
             end 

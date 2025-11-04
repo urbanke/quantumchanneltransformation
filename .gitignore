@@ -22,3 +22,10 @@ Thumbs.db
 
 # --- images ---
 /julia/*.png
+/julia/hashing_bounds_vs_p.png
+
+# --- old files ---
+/rust_kernel/src/*old*
+/julia/src/*old*
+/julia/*old*
+
