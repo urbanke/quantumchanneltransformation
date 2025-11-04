@@ -130,7 +130,7 @@ if __name__ == "__main__":
         orig_vals[i] = 1.0 - H_base2([pI, pX, pY, pZ])
 
     # ---- Range of repetition lengths to consider ----
-    k_min, k_max = 3, 33
+    k_min, k_max = 7, 7
     ks = list(range(k_min, k_max + 1))
 
     # Compute induced bounds for each k, at every x
@@ -151,19 +151,19 @@ if __name__ == "__main__":
     plt.figure(figsize=(10, 6))
 
     # (1) Raw hashing bound for context
-    plt.plot(perr_grid, orig_vals, linewidth=1.0, alpha=0.9,
+    plt.plot(x_grid, orig_vals, linewidth=1.0, alpha=0.9,
              label="Original hashing bound (indep., z=x/9)")
 
     # (2) Optional: show a handful of k-curves faintly
     sample_ks_to_plot = [3, 5, 7, 11, 17, 25, 33]  # edit as you like
     for k, yk in zip(ks, all_ind_vals):
         if k in sample_ks_to_plot:
-            plt.plot(perr_grid, yk, linewidth=0.9, alpha=0.30, label=f"Induced (k={k})")
+            plt.plot(x_grid, yk, linewidth=0.9, alpha=0.30, label=f"Induced (k={k})")
         else:
-            plt.plot(perr_grid, yk, linewidth=0.5, alpha=0.10)
+            plt.plot(x_grid, yk, linewidth=0.5, alpha=0.10)
 
     # (3) Best (envelope) over k
-    plt.plot(perr_grid, best_over_k, linewidth=2.2, linestyle="-",
+    plt.plot(x_grid, best_over_k, linewidth=2.2, linestyle="-",
              label="Envelope = max over k")
 
     plt.xlabel("Per-qubit physical error rate  perr = 1 - pI")
