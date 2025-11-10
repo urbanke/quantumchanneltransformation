@@ -6,9 +6,9 @@ export induced_channel_and_hashing_bound
 
 # Resolve platform-specific default path for the Rust library.
 const DEFAULT_RUST_LIB = get(ENV, "QEC_RUST_LIB",
-    Sys.islinux()  ? joinpath(@__DIR__, "..", "..", "rust-kernel", "target", "release", "librust_kernel.so") :
-    Sys.isapple()  ? joinpath(@__DIR__, "..", "..", "rust-kernel", "target", "release", "librust_kernel.dylib") :
-                     joinpath(@__DIR__, "..", "..", "rust-kernel", "target", "release", "rust_kernel.dll"))
+    Sys.islinux()  ? joinpath(@__DIR__, "..", "..", "rust_kernel", "target", "release", "librust_kernel.so") :
+    Sys.isapple()  ? joinpath(@__DIR__, "..", "..", "rust_kernel", "target", "release", "librust_kernel.dylib") :
+                     joinpath(@__DIR__, "..", "..", "rust_kernel", "target", "release", "rust_kernel.dll"))
 
 """
     induced_channel_and_hashing_bound(H, Lx, Lz, G, p_tuple) -> (pbar, hashing_bound)

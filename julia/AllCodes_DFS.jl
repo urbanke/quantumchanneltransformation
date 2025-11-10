@@ -117,7 +117,7 @@ function All_Codes_DFS(ChannelType, n, k)
             S_best  = copy(S)
         end
 
-        if count % 100000 == 0
+        if count % 8 == 0
             println("Matrix Num ", count)
             println("pz = ", pz)
             println("hb_best = ", hb_best)
@@ -129,8 +129,8 @@ function All_Codes_DFS(ChannelType, n, k)
     println("Valid matrices found: $count")
     println("Efficiency gain: $(round((1 - count/total_possible)*100, digits=1))% pruned")
 end
-ChannelType = "Depolarizing"
-n = 9
-k = 1
+ChannelType = "Independent"
+n = 13
+k = 11
 
 All_Codes_DFS(ChannelType, n, k)

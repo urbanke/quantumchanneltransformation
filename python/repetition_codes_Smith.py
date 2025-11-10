@@ -26,7 +26,7 @@ def pauli_probs_independent(x):
       (pI, pX, pZ, pY): Pauli letter probs
       perr: per-qubit physical error rate = 1 - pI
     """
-    z = x / 9.0
+    z = x 
     pI = (1.0 - x) * (1.0 - z)
     pX = x * (1.0 - z)
     pZ = z * (1.0 - x)
@@ -109,7 +109,7 @@ def induced_hashing_bound_repetition(k, pI, pX, pZ, pY):
     hashing_r = np.zeros(k, dtype=float)
     for r in range(k):
         pbar = conditional_logical_given_r(r, k, pI, pX, pZ, pY)  # 2x2 over (u,v)
-        hashing_r[r] = (1.0 - H_base2(pbar.flatten())) / k
+        hashing_r[r] = max(0,(1.0 - H_base2(pbar.flatten())) / k)
 
     hashing_induced = float(np.dot(Pr, hashing_r))
     return hashing_induced, Pr, hashing_r
@@ -120,7 +120,7 @@ def induced_hashing_bound_repetition(k, pI, pX, pZ, pY):
 if __name__ == "__main__":
     # ---- Sweep the channel parameter (x), map to perr ----
     # x := X-flip probability; Z-flip uses z = x/9
-    x_grid = np.linspace(0.2, 0.3, 200)
+    x_grid = np.linspace(0.0, 0.3, 200)
 
     perr_grid = np.empty_like(x_grid)
     orig_vals = np.empty_like(x_grid)

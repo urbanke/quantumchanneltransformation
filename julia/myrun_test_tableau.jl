@@ -16,9 +16,16 @@ using QECInduced, .Symplectic
 # Stabilizers = ["ZZI", "IZZ"]  # 3-qubit repetition
 # Stabilizers = ["XXIII", "IXXII", "IIXXI", "IIIXX"] # alt 5-qubit repetition flavor
 # Stabilizers = ["IYIIX", "IIIIX"]
-# Stabilizers = ["ZZIII", "ZIZII","ZIIZI", "ZIIIZ"]
-Stabilizers = ["ZZIIIII", "ZIZIIII","ZIIZIII", "ZIIIZII", "ZIIIIZI", "ZIIIIIZ"]
+#Stabilizers = ["ZZIII", "ZIZII","ZIIZI", "ZIIIZ"]
+#Stabilizers = ["IIIIIIZ", "IIIIIZI", "IIIIZII", "IIZZZII", "IXZIZZZ"
 
+
+#7,1 repitition code (Smith Paper)
+#Stabilizers = ["ZZIIIII", "ZIZIIII","ZIIZIII", "ZIIIZII", "ZIIIIZI", "ZIIIIIZ"]
+#7,1 code found for independent channel (through DFS) 
+#Stabilizers = ["IIIIIIZ", "IIIIIZI", "IIIIZII", "IIIZIII", "XZIZZZZ", "XIXZZZZ"]
+#7,5 code found for independent channel (through DFS) 
+Stabilizers = ["IIIIIZZ", "IIIIXZI"]
 CHANNEL = "Independent"
 #CHANNEL = "Depolarizing"
 
@@ -45,8 +52,8 @@ H, Lx, Lz, G = QECInduced.tableau_from_stabilizers(S)
 @show Symplectic.sanity_check(H, Lx, Lz, G)
 
 # Channel parameter
-px = 0.26
-pz = px/9.0
+px = 0.11002786443835955
+pz = px 
 @show px,pz
 
 # Single-qubit Pauli channel tuple (pI, pX, pZ, pY)
