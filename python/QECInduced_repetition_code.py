@@ -289,10 +289,10 @@ def sweep_and_plot(m=3, ell=3, p_min=0.0, p_max=0.3, num=61):
 if __name__ == "__main__":
     # Example: Shor-style two-stage repetition with m=3 (X-protection), ell=3 (Z-protection)
     m = 3
-    ell = 3
+    ell = 1
 
     # Show a single p example for each channel family
-    p_example = 0.06
+    p_example = 0.11002786443835955
     p_indep = pauli_channel_independent(p_example)
     p_depol = pauli_channel_depolarizing(p_example)
 
