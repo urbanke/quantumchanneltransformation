@@ -98,7 +98,7 @@ function valid_code(S::AbstractMatrix{Bool})
 end 
 
 
-function build_from_bits(S::AbstractMatrix{Bool})
+function build_from_bits(S)
     k = size(S,1)
     n = div(size(S,2),2) 
     Xs = S[:,1:n]

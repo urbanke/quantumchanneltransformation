@@ -130,10 +130,10 @@ function check_induced_channel(S, pz; ChannelType = "Independent")
     @assert(Symplectic.sanity_check(H,Lx,Lz,G) == true, "Error Constructing Tableau")
 
     if ChannelType == "Depolarizing"
-        pbar, hb = Induced.induced_channel_and_hashing_bound(H, Lx, Lz, G, ((1-pz), pz/3, pz/3, pz/3))
+         hb = Induced.induced_channel_and_hashing_bound(H, Lx, Lz, G, ((1-pz), pz/3, pz/3, pz/3))
 #        grid = QECInduced.sweep_depolarizing_grid(H, Lx, Lz, G; p_min=0.0, p_max=0.5, step=step, threads=4)
     else
-        pbar, hb = Induced.induced_channel_and_hashing_bound(H, Lx, Lz, G, ((1-pz)*(1-pz), (1-pz)*pz, pz*(1-pz), pz*pz))
+         hb = Induced.induced_channel_and_hashing_bound(H, Lx, Lz, G, ((1-pz)*(1-pz), (1-pz)*pz, pz*(1-pz), pz*pz))
 #        grid = QECInduced.sweep_independent_grid(H, Lx, Lz, G; p_min=0.0, p_max=0.5, step=step, threads=4)
     end
     return hb
@@ -153,8 +153,8 @@ function demo()
     Lx = falses(1, 2n); Lx[1, 1] = true  # X on qubit 1
     Lz = falses(1, 2n); Lz[1, n+1] = true  # Z on qubit 1
 
-    pbar, hb = induced_channel_and_hashing_bound(H, Lx, Lz, G; p=0.1)
-    @info "pbar shape = $(size(pbar)) sum=$(sum(pbar)) hashing_bound=$hb"
+     hb = induced_channel_and_hashing_bound(H, Lx, Lz, G; p=0.1)
+    #@info "pbar shape = $(size(pbar)) sum=$(sum(pbar)) hashing_bound=$hb"
 
     grid = sweep_depolarizing_grid(H, Lx, Lz, G; p_min=0.0, p_max=0.2, step=0.05, threads=2)
     @info "grid =\n$(grid)"

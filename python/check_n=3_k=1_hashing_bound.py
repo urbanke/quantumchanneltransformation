@@ -62,7 +62,7 @@ def multiply_strings(p, q):
 
 n = 3
 k = 1
-g1 = "ZIX"
+g1 = "ZXI"
 g2 = "IXX"
 G = [g1, g2]
 G_symp = [pauli_str_to_symp(g) for g in G]
@@ -170,7 +170,7 @@ def compute_tables(p=0.11, verbose=True):
         Pr[r] += pe
         Puvr[(uv, r)] += pe
         # keep a few rows per r to sanity check (optional)
-        if verbose and len(sample_rows[r]) < 4:
+        if verbose and len(sample_rows[r]) < 64:
             sample_rows[r].append((pattern, uv, pe))
 
     # Per-syndrome conditionals and entropies

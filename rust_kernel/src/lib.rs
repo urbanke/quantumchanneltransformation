@@ -103,7 +103,7 @@ pub extern "C" fn compute_pbar_and_hashing_bound(
     pY: f64,
 
     // outputs
-    pbar_out_ptr: *mut f64, // length A*B  (A==B==2^k)
+    //pbar_out_ptr: *mut f64, // length A*B  (A==B==2^k)
 ) -> f64 {
     let ttab_u = unsafe { slice::from_raw_parts(ttab_u_ptr, t_rows * words) };
     let ttab_v = unsafe { slice::from_raw_parts(ttab_v_ptr, t_rows * words) };
@@ -135,12 +135,12 @@ pub extern "C" fn compute_pbar_and_hashing_bound(
     // then sequentially accumulate to pbar_accum to avoid atomics.
     #[derive(Clone)]
     struct SRes {
-        ml_a: usize,
-        ml_b: usize,
+     //   ml_a: usize,
+     //   ml_b: usize,
         p_sum: f64,
         p_weighted_entropy: f64,
         // shifted, unnormalized table over (a',b') for this s  (size A×B)
-        shifted: Vec<f64>,
+     //   shifted: Vec<f64>,
     }
 
     let per_s_results: Vec<SRes> = (0..s_rows).into_par_iter().map(|s_idx| {
@@ -188,36 +188,36 @@ pub extern "C" fn compute_pbar_and_hashing_bound(
         // Probability of the syndrome p(s) = sum_{a,b} P_s(a,b)
         let p_s: f64 = ps.iter().copied().sum();
 
-        // ML (a*,b*)
-        let mut ml_a = 0usize;
-        let mut ml_b = 0usize;
-        if p_s > 0.0 {
-            let mut best = 0.0f64;
-            for a in 0..a_dim_us {
-                for b in 0..b_dim_us {
-                    let val = ps[a * b_dim_us + b];
-                    if val > best {
-                        best = val;
-                        ml_a = a;
-                        ml_b = b;
-                    }
-                }
-            }
-        }
+        // // ML (a*,b*)
+        // let mut ml_a = 0usize;
+        // let mut ml_b = 0usize;
+        // if p_s > 0.0 {
+        //     let mut best = 0.0f64;
+        //     for a in 0..a_dim_us {
+        //         for b in 0..b_dim_us {
+        //             let val = ps[a * b_dim_us + b];
+        //             if val > best {
+        //                 best = val;
+        //                 ml_a = a;
+        //                 ml_b = b;
+        //             }
+        //         }
+        //     }
+        // }
 
         // Produce shifted table q_s(a',b') = P_s(a'⊕a*, b'⊕b*) / p_s
-        let mut shifted = vec![0.0f64; a_dim_us * b_dim_us];
+        // let mut shifted = vec![0.0f64; a_dim_us * b_dim_us];
         let h_s: f64;
         if p_s > 0.0 {
-            for a_prime in 0..a_dim_us {
-                for b_prime in 0..b_dim_us {
-                    let a = a_prime ^ ml_a;
-                    let b = b_prime ^ ml_b;
-                    shifted[a_prime * b_dim_us + b_prime] = ps[a * b_dim_us + b];
-                }
-            }
+        //    for a_prime in 0..a_dim_us {
+        //        for b_prime in 0..b_dim_us {
+        //            let a = a_prime ^ ml_a;
+        //            let b = b_prime ^ ml_b;
+        //            shifted[a_prime * b_dim_us + b_prime] = ps[a * b_dim_us + b];
+        //        }
+        //    }
             // Normalize to conditional and compute H(q_s)
-            let mut tmp = shifted.clone();
+            let mut tmp = ps.clone();
             for x in &mut tmp {
                 *x /= p_s;
             }
@@ -227,39 +227,39 @@ pub extern "C" fn compute_pbar_and_hashing_bound(
         }
 
         SRes {
-            ml_a,
-            ml_b,
+        //    ml_a,
+        //    ml_b,
             p_sum: p_s,
             p_weighted_entropy: p_s * h_s,
-            shifted, // still unnormalized; used to build marginal p̄ later
+        //    shifted, // still unnormalized; used to build marginal p̄ later
         }
     }).collect();
 
     // Accumulate p̄(a',b') = Σ_s shifted(a',b'), then normalize it.
-    for sr in &per_s_results {
-        for (i, v) in sr.shifted.iter().enumerate() {
-            pbar_accum[i] += *v;
-        }
-    }
-    let total_mass: f64 = pbar_accum.iter().copied().sum();
-    let pbar_norm: Vec<f64> = if total_mass > 0.0 {
-        pbar_accum.iter().map(|&x| x / total_mass).collect()
-    } else {
-        // degenerate channel; keep uniform to avoid NaNs
-        vec![1.0 / (a_dim as f64 * b_dim as f64); a_dim * b_dim]
-    };
+    // for sr in &per_s_results {
+    //     for (i, v) in sr.shifted.iter().enumerate() {
+    //         pbar_accum[i] += *v;
+    //     }
+    // }
+    // let total_mass: f64 = pbar_accum.iter().copied().sum();
+    // let pbar_norm: Vec<f64> = if total_mass > 0.0 {
+    //     pbar_accum.iter().map(|&x| x / total_mass).collect()
+    // } else {
+    //     // degenerate channel; keep uniform to avoid NaNs
+    //     vec![1.0 / (a_dim as f64 * b_dim as f64); a_dim * b_dim]
+    // };
 
     // New: H_bar = Σ_s p(s) H(p(a',b'|s))
     let h_bar: f64 = per_s_results.iter().map(|sr| sr.p_weighted_entropy).sum::<f64>();
 
     // Hashing bound with the *conditional* entropy
     let k = k_log as f64;
-    let n_f = (n_sites as f64);
+    let n_f = n_sites as f64;
     let hashing_bound = (k - h_bar) / n_f;
 
     // Write p̄ to output
-    let out = unsafe { slice::from_raw_parts_mut(pbar_out_ptr, pbar_norm.len()) };
-    out.copy_from_slice(&pbar_norm);
+    // let out = unsafe { slice::from_raw_parts_mut(pbar_out_ptr, pbar_norm.len()) };
+    // out.copy_from_slice(&pbar_norm);
 
     hashing_bound
 }

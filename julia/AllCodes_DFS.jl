@@ -18,6 +18,44 @@ The verify function receives the partial matrix and the index of the row just ad
 Return false to skip all matrices that extend this partial configuration.
 """
 
+function iterate_upper_triangular_matrices(n::Int, r::Int, verify_fn::Function)
+    nb = div(n,2)
+    Channel() do ch
+        matrix = zeros(Int, r, n)
+
+        function build_rows(row_idx::Int)
+            if row_idx > r
+                put!(ch, copy(matrix))
+                return
+            end
+
+
+            # Number of columns allowed for this row
+            allowed_cols = n - row_idx + 1
+
+            for i in 0:(2^allowed_cols - 1)
+                temp = i
+                # Fill allowed columns only
+                for col in n:-1:row_idx
+                    matrix[row_idx, col] = temp & 1
+                    temp >>= 1
+                end
+                # Ensure columns before start_col are zero
+                for col in 1:(row_idx - 1)
+                    matrix[row_idx, col] = 0
+                end
+
+                if verify_fn(matrix, row_idx, nb)
+                    build_rows(row_idx + 1)
+                end
+            end
+        end
+
+        build_rows(1)
+    end
+end
+
+
 function iterate_binary_matrices_with_check(n::Int, r::Int, verify_fn::Function)
     Channel() do ch
         # Build matrix recursively, row by row
@@ -108,7 +146,7 @@ function All_Codes_DFS(ChannelType, n, k)
         count = 0
     total_possible = 2^(2*n*r)
     println("Total possible: $total_possible")
-    for matrix in iterate_binary_matrices_with_check(2*n, r, good_code)
+    for matrix in iterate_upper_triangular_matrices(2*n, r, good_code)
         count += 1
         S = Matrix{Bool}(matrix)
         hb_temp = QECInduced.check_induced_channel(S, pz; ChannelType = ChannelType)
@@ -117,7 +155,7 @@ function All_Codes_DFS(ChannelType, n, k)
             S_best  = copy(S)
         end
 
-        if count % 8 == 0
+        if count % 2 == 0
             println("Matrix Num ", count)
             println("pz = ", pz)
             println("hb_best = ", hb_best)
@@ -130,7 +168,10 @@ function All_Codes_DFS(ChannelType, n, k)
     println("Efficiency gain: $(round((1 - count/total_possible)*100, digits=1))% pruned")
 end
 ChannelType = "Independent"
-n = 13
-k = 11
+n = 4
+k = 2
+elapsed_time = @elapsed begin
+    All_Codes_DFS(ChannelType, n, k)
+end
+println("Elapsed time: $elapsed_time seconds") 
 
-All_Codes_DFS(ChannelType, n, k)

@@ -101,15 +101,14 @@ function errorBasedOnSynd(recieved,PS, pchannel,logicalX, logicalZ)
 	end
 	maxVal = 0 
 	maxKey = 0
-	#println(logicalDict)
 	for i in 0:3
 		logicalDict[i] = logicalDict[i]/PS
-		println(i, " ", logicalDict[i])
 		if logicalDict[i] >= maxKey
 			maxKey = logicalDict[i]
 			maxVal = i 
 		end
 	end
+	println(logicalDict)
  	return maxVal # return the logical correction that has the most probability  a(s), b(s)
 end
 
@@ -118,8 +117,9 @@ logicalZ = Bool[1,0,0,0,1,1] # XYY
 syndromeRepair = [0,0,0,0]
 
 for i in 0:3 
-	println("="^10,i,"="^10)
+	println("="^50,i,"="^50)
 	syndromeRepair[i+1] = errorBasedOnSynd(AllRecieved[i],SyndromeDict[i],pchannel,logicalX, logicalZ)
+	println()
 end
 
 function inducedChannel(recieved,PS, pchannel,logicalX, logicalZ, repair)
@@ -158,13 +158,16 @@ function inducedChannel(recieved,PS, pchannel,logicalX, logicalZ, repair)
 		inducedDict[i] = inducedDict[i]/PS
 		h -= inducedDict[i]*log2(inducedDict[i])
 	end
-	println((1-h)/3)
+	println(inducedDict)
+	println("Syrdome: (",xrepair,",",zrepair,"), (1 - H(p(a,b|s))/3 = ",(1-h)/3)
  	return h*PS
 end
 
 global H = 0 
 for i in 0:3 
+	println("="^50,i,"="^50)
 	global H += inducedChannel(AllRecieved[i],SyndromeDict[i], pchannel,logicalX, logicalZ, syndromeRepair[i+1])
+	println()
 end
 println((1-H)/3)
 

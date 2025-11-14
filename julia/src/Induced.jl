@@ -67,7 +67,7 @@ function induced_channel_and_hashing_bound(H::AbstractMatrix{Bool},
     SGV   = Bitpack.span_bitpacked(patt_r, GV)
 
     # Prepare output pbar
-    pbar = zeros(Float64, A, A)
+    # pbar = zeros(Float64, A, A)
 
     @assert isfile(DEFAULT_RUST_LIB) "Rust library not found at: $(DEFAULT_RUST_LIB). Set QEC_RUST_LIB if needed."
 
@@ -77,18 +77,18 @@ function induced_channel_and_hashing_bound(H::AbstractMatrix{Bool},
           Ptr{UInt64}, Ptr{UInt64}, Csize_t,
           Ptr{UInt64}, Ptr{UInt64}, Csize_t,
           Ptr{UInt64}, Ptr{UInt64}, Csize_t,
-          Cuint, Cuint, Cuint, Cdouble, Cdouble, Cdouble, Cdouble,
-          Ptr{Float64}
+          Cuint, Cuint, Cuint, Cdouble, Cdouble, Cdouble, Cdouble
+          #Ptr{Float64}
         ),
         pointer(TtabU), pointer(TtabV), size(TtabU,1), size(TtabU,2),
         pointer(ALU),   pointer(ALV),   size(ALU,1),
         pointer(BLU),   pointer(BLV),   size(BLU,1),
         pointer(SGU),   pointer(SGV),   size(SGU,1),
         UInt32(n), UInt32(r), UInt32(k), pI, pX, pZ, pY,
-        pointer(pbar)
+        #pointer(pbar)
     )
 
-    return pbar, hashing_bound
+    return  hashing_bound
 end
 
 end # module
