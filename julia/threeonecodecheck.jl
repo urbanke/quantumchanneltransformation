@@ -26,18 +26,6 @@ end
 
 Stabilizers = ["ZXI", "IXX"]
 S = Symplectic.build_from_stabs(Stabilizers)
-#H, Lx, Lz, G = QECInduced.tableau_from_stabilizers(S)
-
-#@show size(H)  # (r, 2n)
-#@show size(Lx) # (k, 2n)
-#@show size(Lz) # (k, 2n)
-#@show size(G)  # (r, 2n)
-
-#@show H
-#@show Lx
-#@show Lz
-#@show G
-
 
 function decimal_to_bin(number, width)
     out = Vector{Bool}(undef, width)
@@ -88,6 +76,7 @@ end
 
 
 function errorBasedOnSynd(recieved,PS, pchannel,logicalX, logicalZ)
+
 	logicalprob = 0 
 
 	logicalDict = Dict(0 => 0.0, 1 => 0.0, 2 => 0.0, 3 => 0.0)
@@ -112,6 +101,7 @@ function errorBasedOnSynd(recieved,PS, pchannel,logicalX, logicalZ)
 	end
 	maxVal = 0 
 	maxKey = 0
+	#println(logicalDict)
 	for i in 0:3
 		logicalDict[i] = logicalDict[i]/PS
 		println(i, " ", logicalDict[i])
@@ -120,11 +110,11 @@ function errorBasedOnSynd(recieved,PS, pchannel,logicalX, logicalZ)
 			maxVal = i 
 		end
 	end
- 	return maxVal # return the logical correction that has the most probability 
+ 	return maxVal # return the logical correction that has the most probability  a(s), b(s)
 end
 
 logicalX = Bool[0,0,1,0,0,0] # IIX
-logicalZ = Bool[1,0,0,0,1,1] # XZZ
+logicalZ = Bool[1,0,0,0,1,1] # XYY
 syndromeRepair = [0,0,0,0]
 
 for i in 0:3 
@@ -145,9 +135,9 @@ function inducedChannel(recieved,PS, pchannel,logicalX, logicalZ, repair)
 	end 
 	inducedDict = Dict(0 => 0.0, 1 => 0.0, 2 => 0.0, 3 => 0.0)
 
-	for error in recieved
-		residualX = Int(Symplectic.symp_inner(error, logicalX)) ⊻ xrepair # the actual logical when we apply the ML correction 
-		residualZ = Int(Symplectic.symp_inner(error, logicalZ)) ⊻ zrepair
+	for error in recieved 
+		residualX = Int(Symplectic.symp_inner(error, logicalX)) ⊻ xrepair # the residual when we apply the ML correction 
+		residualZ = Int(Symplectic.symp_inner(error, logicalZ)) ⊻ zrepair # a',b' = a ⊕ a(s), b ⊕ b(s) 
 		# calculate num of errors 
 		I = 0; X = 0; Z = 0; Y = 0
 		for j in 1:3 
@@ -165,8 +155,10 @@ function inducedChannel(recieved,PS, pchannel,logicalX, logicalZ, repair)
 	end
 	h = 0 
 	for i in 0:3
+		inducedDict[i] = inducedDict[i]/PS
 		h -= inducedDict[i]*log2(inducedDict[i])
 	end
+	println((1-h)/3)
  	return h*PS
 end
 
