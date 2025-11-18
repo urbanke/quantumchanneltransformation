@@ -223,7 +223,10 @@ end
 
 
 ps = .1:.0001:.15
-h_best, h_old = All_Codes_DFS_envelope(ps, [3,5], ChannelType)
+elapsed_time = @elapsed begin
+    h_best, h_old = All_Codes_DFS_envelope(ps, [3,4,5], ChannelType)
+end
+println("Elapsed time: $elapsed_time seconds") 
 println(h_best .- h_old)
 plt = plot(
     ps, h_old;

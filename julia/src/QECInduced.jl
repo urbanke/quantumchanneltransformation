@@ -133,7 +133,7 @@ function check_induced_channel(S, pz; ChannelType = "Independent", sweep = false
         # pbar, hb = Induced.induced_channel_and_hashing_bound(H, Lx, Lz, G, ((1-pz), pz/3, pz/3, pz/3))
         if sweep == true 
             step = round(Float64(ps.step), digits=5)
-            grid = QECInduced.sweep_independent_grid(H, Lx, Lz, G; p_min=ps[1], p_max=ps[end], step=step, threads=1)
+            grid = QECInduced.sweep_independent_grid(H, Lx, Lz, G; p_min=ps[1], p_max=ps[end], step=step, threads=Threads.nthreads())
             return grid[:,2]
         else 
             hb = Induced.induced_channel_and_hashing_bound(H, Lx, Lz, G, ((1-pz), pz/3, pz/3, pz/3))
@@ -144,7 +144,7 @@ function check_induced_channel(S, pz; ChannelType = "Independent", sweep = false
 #        grid = QECInduced.sweep_independent_grid(H, Lx, Lz, G; p_min=0.0, p_max=0.5, step=step, threads=4)
         if sweep == true 
             step = round(Float64(ps.step), digits=5)
-            grid = QECInduced.sweep_independent_grid(H, Lx, Lz, G; p_min=ps[1], p_max=ps[end], step=step, threads=1)
+            grid = QECInduced.sweep_independent_grid(H, Lx, Lz, G; p_min=ps[1], p_max=ps[end], step=step, threads=Threads.nthreads())
             return grid[:,2]
         else 
             hb = Induced.induced_channel_and_hashing_bound(H, Lx, Lz, G, ((1-pz)*(1-pz), (1-pz)*pz, pz*(1-pz), pz*pz))
