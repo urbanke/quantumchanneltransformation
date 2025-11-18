@@ -25,8 +25,10 @@ using QECInduced, .Symplectic
 #7,1 code found for independent channel (through DFS) 
 #Stabilizers = ["IIIIIIZ", "IIIIIZI", "IIIIZII", "IIIZIII", "XZIZZZZ", "XIXZZZZ"]
 #7,5 code found for independent channel (through DFS) 
-Stabilizers = ["IIIIIZZ", "IIIIXZI"]
+#Stabilizers = ["IIIIIZZ", "IIIIXZI"]
+#3,1 code found for independent channel (through DFS) 
 CHANNEL = "Independent"
+Stabilizers = ["IXX", "ZXI"]
 #CHANNEL = "Depolarizing"
 
 S = Symplectic.build_from_stabs(Stabilizers)
@@ -72,9 +74,9 @@ hashing_orig = 1 - QECInduced.H(p_channel)
 @show hashing_orig
 
 println("\nComputing induced-channel distribution and per-syndrome hashing bound (new definition):")
-pbar, hashing_induced = QECInduced.induced_channel_and_hashing_bound(H, Lx, Lz, G, p_channel)
-@show size(pbar)
-@show pbar
+hashing_induced = QECInduced.induced_channel_and_hashing_bound(H, Lx, Lz, G, p_channel)
+#@show size(pbar)
+#@show pbar
 println("Induced (per-syndrome) hashing bound returned by kernel: (k - Σ_s p(s) H(p(a',b'|s)))/n")
 @show hashing_induced
 
@@ -92,8 +94,8 @@ println("grid:\n", grid)
 # Plot (p, original per-qubit bound, induced per-syndrome bound)
 # -----------------------------
 ps      = grid[:, 1]
-origHB  = grid[:, 2]  # 1 - H(p_channel) per qubit
-indHB   = grid[:, 3]  # (k - Σ_s p(s) H(· | s))/n from the updated kernel
+origHB  = grid[:, 3]  # 1 - H(p_channel) per qubit
+indHB   = grid[:, 2]  # (k - Σ_s p(s) H(· | s))/n from the updated kernel
 
 # Bring in Plots (install if missing)
 try

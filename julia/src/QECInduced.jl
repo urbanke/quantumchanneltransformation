@@ -122,7 +122,7 @@ sweep_independent_grid(H, Lx, Lz, G; p_min=0.0, p_max=1.0, step=0.01, threads=Th
 Takes in a list of stabilizers, as well as the ChannelType (currently only Depolarizing or Independent). If there is a moment where the induced channel is both better than 0 AND H(p_channel), it returns true
 Stabilizer must be in boolean form not XYZ form. 
 """
-function check_induced_channel(S, pz; ChannelType = "Independent")
+function check_induced_channel(S, pz; ChannelType = "Independent", sweep = false, ps = 0:.01:.5)
 # Build tableau/logicals
     H, Lx, Lz, G = QECInduced.tableau_from_stabilizers(S)
 
@@ -131,15 +131,27 @@ function check_induced_channel(S, pz; ChannelType = "Independent")
 
     if ChannelType == "Depolarizing"
         # pbar, hb = Induced.induced_channel_and_hashing_bound(H, Lx, Lz, G, ((1-pz), pz/3, pz/3, pz/3))
-        hb = Induced.induced_channel_and_hashing_bound(H, Lx, Lz, G, ((1-pz), pz/3, pz/3, pz/3))
-
-#        grid = QECInduced.sweep_depolarizing_grid(H, Lx, Lz, G; p_min=0.0, p_max=0.5, step=step, threads=4)
+        if sweep == true 
+            step = round(Float64(ps.step), digits=5)
+            grid = QECInduced.sweep_independent_grid(H, Lx, Lz, G; p_min=ps[1], p_max=ps[end], step=step, threads=1)
+            return grid[:,2]
+        else 
+            hb = Induced.induced_channel_and_hashing_bound(H, Lx, Lz, G, ((1-pz), pz/3, pz/3, pz/3))
+            return hb
+        end 
     else
         # pbar, hb = Induced.induced_channel_and_hashing_bound(H, Lx, Lz, G, ((1-pz)*(1-pz), (1-pz)*pz, pz*(1-pz), pz*pz))
-        hb = Induced.induced_channel_and_hashing_bound(H, Lx, Lz, G, ((1-pz)*(1-pz), (1-pz)*pz, pz*(1-pz), pz*pz))
 #        grid = QECInduced.sweep_independent_grid(H, Lx, Lz, G; p_min=0.0, p_max=0.5, step=step, threads=4)
+        if sweep == true 
+            step = round(Float64(ps.step), digits=5)
+            grid = QECInduced.sweep_independent_grid(H, Lx, Lz, G; p_min=ps[1], p_max=ps[end], step=step, threads=1)
+            return grid[:,2]
+        else 
+            hb = Induced.induced_channel_and_hashing_bound(H, Lx, Lz, G, ((1-pz)*(1-pz), (1-pz)*pz, pz*(1-pz), pz*pz))
+            return hb
+        end
     end
-    return hb
+    #return hb
 end  
 
 
@@ -156,7 +168,7 @@ function demo()
     Lx = falses(1, 2n); Lx[1, 1] = true  # X on qubit 1
     Lz = falses(1, 2n); Lz[1, n+1] = true  # Z on qubit 1
 
-    pbar, hb = induced_channel_and_hashing_bound(H, Lx, Lz, G; p=0.1)
+    #=pbar,=# hb = induced_channel_and_hashing_bound(H, Lx, Lz, G; p=0.1)
     @info "pbar shape = $(size(pbar)) sum=$(sum(pbar)) hashing_bound=$hb"
 
     grid = sweep_depolarizing_grid(H, Lx, Lz, G; p_min=0.0, p_max=0.2, step=0.05, threads=2)
