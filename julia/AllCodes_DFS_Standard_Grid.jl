@@ -483,26 +483,31 @@ Returns:
 - S_best: Best stabilizer matrix found
 - r_best: The r value that gave the best result
 """
-function All_Codes_DFS(ChannelType, n, k; pz=nothing, r_specific=nothing)
+function All_Codes_DFS(ChannelType, n, k; pz=nothing, r_specific=nothing, points=15, customP=nothing, δ = .3)
     s = n - k  # Number of rows in the (n-k) × (2n) matrix
     
-    hb_best = -1.0e9 # close to -inf so that anything beats it 
-    S_best = falses(s, 2n)
-    r_best = -1
+    # Initialize best trackers for each grid point
+
+    S_best = [falses(s, 2n) for _ in 1:points]  # Best matrix at each grid point
+    r_best = fill(-1, points)  # Best r value at each grid point
     
     # Compute pz if not provided
     if pz === nothing 
-        pz = findZeroRate(f, 0, 0.5; maxiter=1000, ChannelType=ChannelType)
+        pz = findZeroRate(f, 0, 0.5; maxiter=1000, ChannelType=ChannelType, customP=customP)
     end 
-    
+    pz_range = range(pz - δ*pz, pz + δ*pz, length=points)    
+    hb_best = QECInduced.sweep_hashing_grid(pz_range, ChannelType; customP = customP)
+
+
     println("=" ^ 70)
     println("Generating binary matrices ($s × $(2*n)) in standard block form")
-    println("Parameters: n=$n, k=$k, s=$s")
+    println("Parameters: n=$n, k=$k, s=$s, grid_points=$points")
     if r_specific !== nothing
         println("Testing only r=$r_specific")
     else
         println("Testing all r values from 0 to $s")
     end
+    println("pz range: [$(pz_range[1]), $(pz_range[end])]")
     println("=" ^ 70)
     
     # Calculate total possible without constraints
@@ -522,32 +527,35 @@ function All_Codes_DFS(ChannelType, n, k; pz=nothing, r_specific=nothing)
         r_val = info.r
         count_by_r[r_val] = get(count_by_r, r_val, 0) + 1
         
-        # Convert to Bool matrix (your code expects Bool)
+        # Convert to Bool matrix
         S = Matrix{Bool}(info.M)
         
-        # Check the induced channel
-        hb_temp = QECInduced.check_induced_channel(S, pz; ChannelType=ChannelType)
+        # Check the induced channel at all grid points
+        hb_grid = QECInduced.check_induced_channel(S, pz; ChannelType=ChannelType, sweep=true, ps=pz_range, customP=customP)
         
-        # Update best if improved
-        if hb_temp >= hb_best
-            hb_best = hb_temp
-            S_best = copy(S)
-            r_best = r_val
+        # Find which grid points improved
+        improved_indices = findall(hb_grid .> (hb_best .+ eps()))
+        
+        # Update best for each improved point
+        if !isempty(improved_indices)
+            for idx in improved_indices
+                hb_best[idx] = hb_grid[idx]
+                S_best[idx] = copy(S)
+                r_best[idx] = r_val
+            end
             
             println("\n" * "=" ^ 70)
             println("NEW BEST FOUND! (Matrix #$count, r=$r_val)")
-            println("pz = $pz")
-            println("hb_best = $hb_best")
-            println("S_best =")
-            println(Symplectic.build_from_bits(S_best))
+            println("Improved at $(length(improved_indices)) grid point(s): $improved_indices")
+            println("\nGrid point details:")
+            for idx in improved_indices
+                println("  Point $idx: pz=$(round(pz_range[idx], digits=4)), hb=$(round(hb_best[idx], digits=6))")
+            end
+            println("\nS_best (showing first improved point) =")
+            println(Symplectic.build_from_bits(S_best[improved_indices[1]]))
             println("=" ^ 70 * "\n")
         end
         
-        # Periodic progress updates
-        if count - last_print_count >= print_interval
-            println("Progress: $count matrices checked (r=$r_val, best_so_far=$hb_best)")
-            last_print_count = count
-        end
     end
     
     println("\n" * "=" ^ 70)
@@ -562,12 +570,35 @@ function All_Codes_DFS(ChannelType, n, k; pz=nothing, r_specific=nothing)
         println("  r=$r_val: $(count_by_r[r_val]) matrices checked")
     end
     
-    println("\nBest result:")
-    println("  r_best = $r_best")
-    println("  hb_best = $hb_best")
-    println("  pz = $pz")
+    #=
+    println("\n" * "=" ^ 70)
+    println("BEST RESULTS BY GRID POINT")
     println("=" ^ 70)
+    for i in 1:points
+        println("Point $i: pz=$(round(pz_range[i], digits=4)) | hb=$(round(hb_best[i], digits=6)) | r=$(r_best[i])")
+    end
     
+    # Check if same code is best across multiple points
+    unique_codes = unique(S_best)
+    println("\n" * "=" ^ 70)
+    println("CODE DIVERSITY")
+    println("=" ^ 70)
+    println("Unique best codes: $(length(unique_codes)) out of $points grid points")
+    
+    # Group grid points by which code is best
+    if length(unique_codes) < points
+        println("\nGrid points sharing the same best code:")
+        for (code_idx, code) in enumerate(unique_codes)
+            matching_points = findall(s -> s == code, S_best)
+            if length(matching_points) > 1
+                println("  Code $code_idx is best at points: $matching_points")
+            end
+        end
+    end
+    
+    println("=" ^ 70)
+    =# 
+
     return hb_best, S_best, r_best
 end
 
@@ -582,13 +613,14 @@ To use threading, start Julia with: `julia -t auto` or `julia -t 8` (for 8 threa
 Check available threads with: `Threads.nthreads()`
 """
 
-function All_Codes_DFS_parallel(ChannelType, n, k; pz=nothing, use_threads=true)
+function All_Codes_DFS_parallel(ChannelType, n, k; pz=nothing, use_threads=true, points = 15, customP = nothing, δ = .3)
     s = n - k
     
     if pz === nothing 
-        pz = findZeroRate(f, 0, 0.5; maxiter=1000, ChannelType=ChannelType)
+        pz = findZeroRate(f, 0, 0.5; maxiter=1000, ChannelType=ChannelType, customP = customP)
     end
-    
+    pz_range = range(pz - δ*pz, pz + δ*pz, length=points)
+
     n_threads = Threads.nthreads()
     println("=" ^ 70)
     println("PARALLEL SEARCH: Testing each r value independently")
@@ -605,6 +637,7 @@ function All_Codes_DFS_parallel(ChannelType, n, k; pz=nothing, use_threads=true)
     r_values = collect(0:s)
     n_r = length(r_values)
     results = Vector{Any}(undef, n_r)
+    s_best = Vector{Any}(undef, points)
     
     if use_threads && n_threads > 1
         # Parallel execution using threads
@@ -614,7 +647,7 @@ function All_Codes_DFS_parallel(ChannelType, n, k; pz=nothing, use_threads=true)
             r_val = r_values[i]
             println("Thread $(Threads.threadid()): Starting r=$r_val")
             
-            hb, S, r = All_Codes_DFS(ChannelType, n, k; pz=pz, r_specific=r_val)
+            hb, S, r = All_Codes_DFS(ChannelType, n, k; pz=pz, r_specific=r_val, customP = customP, δ = δ)
             results[i] = (r=r_val, hb=hb, S=S)
             
             println("Thread $(Threads.threadid()): Completed r=$r_val, hb=$hb")
@@ -626,14 +659,19 @@ function All_Codes_DFS_parallel(ChannelType, n, k; pz=nothing, use_threads=true)
             r_val = r_values[i]
             println("\n--- Starting search for r=$r_val ---")
             
-            hb, S, r = All_Codes_DFS(ChannelType, n, k; pz=pz, r_specific=r_val)
+            hb, S, r = All_Codes_DFS(ChannelType, n, k; pz=pz, r_specific=r_val, points = points, customP = customP, δ = δ)
             results[i] = (r=r_val, hb=hb, S=S)
         end
     end
-    
+    total_best = QECInduced.sweep_hashing_grid(pz_range, ChannelType; customP = customP)
+    for i in 1:n_r 
+        replaceIndices = findall(results[i].hb .> total_best)
+        s_best[replaceIndices] = (results[i].S)[replaceIndices]
+        total_best = max.(total_best, results[i].hb)
+    end
     # Find overall best
-    best_idx = argmax([res.hb for res in results])
-    best_result = results[best_idx]
+    #best_idx = argmax([res.hb for res in results])
+    #best_result = results[best_idx]
     
     println("\n" * "=" ^ 70)
     println("PARALLEL SEARCH COMPLETE")
@@ -644,93 +682,11 @@ function All_Codes_DFS_parallel(ChannelType, n, k; pz=nothing, use_threads=true)
     end
     println("-" ^ 70)
     println("OVERALL BEST:")
-    println("  r_best = $(best_result.r)")
-    println("  hb_best = $(best_result.hb)")
+    #println("  r_best = $(best_result.r)")
+    println("  overall_best = $(total_best)")
     println("=" ^ 70)
     
-    return best_result.hb, best_result.S, best_result.r
-end
-
-
-"""
-    All_Codes_DFS_parallel_with_progress(ChannelType, n, k; pz=nothing)
-
-Parallel version with thread-safe progress tracking.
-Uses atomic counters to track progress across threads.
-"""
-function All_Codes_DFS_parallel_with_progress(ChannelType, n, k; pz=nothing)
-    s = n - k
-    
-    if pz === nothing 
-        pz = findZeroRate(f, 0, 0.5; maxiter=1000, ChannelType=ChannelType)
-    end
-    
-    n_threads = Threads.nthreads()
-    println("=" ^ 70)
-    println("PARALLEL SEARCH WITH PROGRESS TRACKING")
-    println("Parameters: n=$n, k=$k, s=$s")
-    println("Threads: $n_threads")
-    println("=" ^ 70)
-    
-    # Thread-safe progress tracking
-    completed = Threads.Atomic{Int}(0)
-    total_r = s + 1
-    
-    # Pre-allocate results
-    r_values = collect(0:s)
-    results = Vector{Any}(undef, total_r)
-    
-    # Progress reporter task
-    progress_task = @async begin
-        while completed[] < total_r
-            sleep(5)  # Update every 5 seconds
-            done = completed[]
-            if done < total_r
-                println("[Progress] Completed $done/$total_r r values...")
-            end
-        end
-    end
-    
-    println("\nStarting parallel search...")
-    start_time = time()
-    
-    Threads.@threads for i in 1:total_r
-        r_val = r_values[i]
-        
-        hb, S, r = All_Codes_DFS(ChannelType, n, k; pz=pz, r_specific=r_val)
-        results[i] = (r=r_val, hb=hb, S=S)
-        
-        # Update progress atomically
-        Threads.atomic_add!(completed, 1)
-        done = completed[]
-        
-        println("✓ Thread $(Threads.threadid()): r=$r_val complete ($done/$total_r), hb=$hb")
-    end
-    
-    elapsed_time = time() - start_time
-    
-    # Wait for progress task to finish
-    wait(progress_task)
-    
-    # Find overall best
-    best_idx = argmax([res.hb for res in results])
-    best_result = results[best_idx]
-    
-    println("\n" * "=" ^ 70)
-    println("PARALLEL SEARCH COMPLETE")
-    println("Total time: $(round(elapsed_time, digits=2)) seconds")
-    println("-" ^ 70)
-    println("Results by r value:")
-    for res in results
-        println("  r=$(res.r): hb=$(round(res.hb, digits=6))")
-    end
-    println("-" ^ 70)
-    println("OVERALL BEST:")
-    println("  r_best = $(best_result.r)")
-    println("  hb_best = $(best_result.hb)")
-    println("=" ^ 70)
-    
-    return best_result.hb, best_result.S, best_result.r
+    return total_best, s_best
 end
 
 
@@ -848,14 +804,103 @@ function compare_enumeration_methods(n, k)
     println("\n" * "=" ^ 70)
 end
 
+function envelope_finder(n_range, ChannelType; pz = nothing, customP = nothing, points = 15, δ = .3)
+
+    if pz === nothing 
+        pz = findZeroRate(f, 0, 0.5; maxiter=1000, ChannelType=ChannelType, customP = customP)
+    end
+
+    pz_range = range(pz - δ*pz, pz + δ*pz, length=points)
+
+    hashing = QECInduced.sweep_hashing_grid(pz_range, ChannelType; customP = customP)
+    println(hashing)
+    base_grid = copy(hashing)
+    s_best = Vector{Any}(undef, points)
+    elapsed_time = @elapsed begin
+        for n in n_range
+            for k in 1:(n-1)
+                elapsed_time_internal = @elapsed begin
+                    best_grid, S_grid = All_Codes_DFS_parallel(ChannelType, n, k; customP = customP, points = points, δ = δ)
+                    improve_indices = findall(best_grid .> base_grid)
+                    s_best[improve_indices] = S_grid[improve_indices]
+                    base_grid = max.(base_grid,best_grid)
+                end
+                println("Elapsed time: $elapsed_time_internal seconds") 
+            end
+         end
+    end
+    println("Total time: $elapsed_time seconds")
+    p_plot = copy(pz_range)
+    if customP === nothing 
+        #p_plot = pz_range
+    else 
+        p_plot = zeros(points)
+        for i in 1:points
+            p_plot[i] = customP(pz_range[i]; plot = true)
+        end 
+    end
+    println("p: ", pz_range)
+    plt = plot(
+        p_plot, hashing;
+        label = "Original channel (per-qubit 1 - H(p))",
+        xlabel = ChannelType * " probability p",
+        ylabel = "Hashing bound",
+        title = "Hashing bounds vs p",
+        marker = :circle,
+        linewidth = 2,
+    )
+
+    plot!(plt, p_plot, base_grid; label = "Induced (per-syndrome conditional entropy)", marker = :square, linewidth = 2)
+
+    # Save figure (and print the path)
+    outfile = "hashing_bound_envelope.png"
+    savefig(plt, outfile)
+    println("Saved plot to $(outfile)")
+
+
+    open("hashing_bound_envelope.txt", "w") do file
+        for i in 1:points
+            if base_grid[i] > hashing[i]
+                s_best_point = Symplectic.build_from_bits(s_best[i])
+                write(file, "Point: $(pz_range[i])\n")
+                write(file, "Induced Hashing Bound: $(base_grid[i])\n")
+                write(file, "S Matrix:\n")
+                write(file, join(string.(s_best_point), " ") * "\n\n")
+            end
+        end
+    end
+
+
+
+    return hashing, base_grid, s_best
+end
+
+
+function ninexz(x; tuple = false, plot = false ) # this is an example of customP, which gives the same one smith did 
+    z = x/9
+    pI = (1-z)*(1-x) 
+    pX = x*(1-z) 
+    pZ = z*(1-x)
+    pY = z*x
+    if tuple # this should always be here, do not touch 
+        return (pI, pX, pZ, pY)
+    end
+    if plot # this is to plot different things (for example, smith plots 1-pI instead of pX despite working with pX)
+        return 1-pI 
+    end 
+    return [pI, pX, pZ, pY]
+end 
+
+
+# Options: 
+# ChannelType = "Independent" or "Depolarizing" w/ customP = nothing 
+# ChannelType = Anything w/ a custom customP function (example being ninexz)
 
 function main()
-    elapsed_time = @elapsed begin
-        n, k = 5, 2  # => s = n-k = 2; matrices are 2 × (2n) = 2 × 6
-        ChannelType = "Independent"
-        All_Codes_DFS_parallel(ChannelType, n, k)
-    end
-    println("Elapsed time: $elapsed_time seconds") 
+    ChannelType = "X by 9" 
+    n_range = [3] 
+    hashing, base_grid, s_best = envelope_finder(n_range, ChannelType; customP = ninexz)
+
 end
 
 # Run the main function

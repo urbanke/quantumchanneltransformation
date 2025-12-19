@@ -18,6 +18,7 @@ The verify function receives the partial matrix and the index of the row just ad
 Return false to skip all matrices that extend this partial configuration.
 """
 
+
 function iterate_upper_triangular_matrices(n::Int, r::Int, verify_fn::Function)
     nb = div(n,2)
     Channel() do ch
@@ -28,6 +29,10 @@ function iterate_upper_triangular_matrices(n::Int, r::Int, verify_fn::Function)
                 put!(ch, copy(matrix))
                 return
             end
+
+            #if is_canonical(matrix)
+            #    println(matrix)
+            #end 
 
 
             # Number of columns allowed for this row
@@ -77,9 +82,9 @@ function iterate_binary_matrices_with_check(n::Int, r::Int, verify_fn::Function)
                     matrix[row_idx, col] = temp & 1
                     temp >>= 1
                 end
-                
                 # Verify compatibility with previous rows
                 if verify_fn(matrix, row_idx, nb)
+                    #println(matrix)
                     # If valid, continue to next row
                     build_rows(row_idx + 1)
                 end
@@ -147,7 +152,7 @@ function All_Codes_DFS(ChannelType, n, k; pz = nothing)
         count = 0
     total_possible = 2^(2*n*r)
     println("Total possible: $total_possible")
-    for matrix in iterate_upper_triangular_matrices(2*n, r, good_code)
+    for matrix in iterate_binary_matrices_with_check(2*n, r, good_code)
         count += 1
         S = Matrix{Bool}(matrix)
         hb_temp = QECInduced.check_induced_channel(S, pz; ChannelType = ChannelType)
@@ -156,7 +161,7 @@ function All_Codes_DFS(ChannelType, n, k; pz = nothing)
             S_best  = copy(S)
         end
 
-        if count % 2 == 0
+        if count % 2^(n*r - 2) == 0
             println("Matrix Num ", count)
             println("pz = ", pz)
             println("hb_best = ", hb_best)
@@ -221,7 +226,7 @@ function All_Codes_DFS_envelope(ps, n_range, ChannelType)
 end 
 
 
-
+#=
 ps = .1:.0001:.15
 elapsed_time = @elapsed begin
     h_best, h_old = All_Codes_DFS_envelope(ps, [3,4,5], ChannelType)
@@ -241,18 +246,18 @@ plot!(plt, ps, h_best; label = "Envelope", linewidth = 2)
 outfile = "envelope.png"
 savefig(plt, outfile)
 println("Saved plot to $(outfile)")
+=#
 
 
-#= 
-n = 3
+n = 4
 k = 1
 elapsed_time = @elapsed begin
-    bestH, bestS = All_Codes_DFS(ChannelType, n, k; pz = .3)
+    bestH, bestS = All_Codes_DFS(ChannelType, n, k)
 end
 println("Elapsed time: $elapsed_time seconds") 
 println(bestH)
 println(bestS)
-=#
+
 
 #=function getEnvelope(ps, n_min, n_max, ChannelType; threads::Int=nthreads())
     best_code_rate_min3_max5 = zeros(length(ps))
