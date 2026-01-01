@@ -22,15 +22,15 @@ using .ParallelSweep
 
 
 
-function findZeroRate(f, a, b; tol=1e-16, maxiter=1000, ChannelType = "Independent")
-    fa, fb = f(a; ChannelType = ChannelType), f(b; ChannelType = ChannelType)
+function findZeroRate(f, a, b; tol=1e-16, maxiter=1000, ChannelType = "Independent", customP = nothing)
+    fa, fb = f(a; ChannelType = ChannelType, customP = customP), f(b; ChannelType = ChannelType, customP = customP)
     if fa * fb > 0
         error("f(a) and f(b) must have opposite signs")
     end
 
     for i in 1:maxiter
         c = (a + b) / 2
-        fc = f(c; ChannelType = ChannelType)
+        fc = f(c; ChannelType = ChannelType, customP = customP)
 
         if abs(fc) < tol || (b - a)/2 < tol
             return c  # found root
@@ -46,11 +46,13 @@ function findZeroRate(f, a, b; tol=1e-16, maxiter=1000, ChannelType = "Independe
     return (a + b) / 2  # best estimate after maxiter
 end
 
-function f(p; ChannelType = "Independent")
+function f(p; ChannelType = "Independent", customP = nothing)
     if ChannelType == "Depolarizing"
         pc = [1-p, p/3,p/3,p/3]
-    else 
+    elseif ChannelType == "Independent"
         pc = [(1-p)*(1-p), p*(1-p), p*(1-p),p*p]
+    else 
+        pc = customP(p)#[customP[1], customP[2], customP[3], customP[4]]
     end
     return 1 - H(pc)
 end
@@ -114,6 +116,27 @@ Returns a 2-column matrix `[p  induced_hashing_bound 1-h(p)]`.
 sweep_independent_grid(H, Lx, Lz, G; p_min=0.0, p_max=1.0, step=0.01, threads=Threads.nthreads()) =
     ParallelSweep.sweep_independent_grid(H, Lx, Lz, G; p_min, p_max, step, threads)
 
+"""
+    sweep_custom_grid(H, Lx, Lz, G, customP; p_min=0.0, p_max=1.0, step=0.01, threads=Threads.nthreads())
+
+Parallel sweep of custom channel with parameter customP as pI,pX,pZ,pY in [p_min, p_max] with the given step.
+Returns a 2-column matrix `[p  induced_hashing_bound 1-h(p)]`.
+"""
+sweep_custom_grid(H, Lx, Lz, G, customP; p_min=0.0, p_max=1.0, step=0.01, threads=Threads.nthreads()) =
+    ParallelSweep.sweep_custom_grid(H, Lx, Lz, G, customP; p_min, p_max, step, threads)
+
+
+"""
+    sweep_hashing_grid(ps,  ChannelType; customP = nothing))
+
+Calculates hashing bound for a list of points ps 
+"""
+sweep_hashing_grid(ps,  ChannelType; customP = nothing) =
+    ParallelSweep.sweep_hashing_grid(ps,  ChannelType; customP)
+
+
+
+
 
 """
 
@@ -122,7 +145,7 @@ sweep_independent_grid(H, Lx, Lz, G; p_min=0.0, p_max=1.0, step=0.01, threads=Th
 Takes in a list of stabilizers, as well as the ChannelType (currently only Depolarizing or Independent). If there is a moment where the induced channel is both better than 0 AND H(p_channel), it returns true
 Stabilizer must be in boolean form not XYZ form. 
 """
-function check_induced_channel(S, pz; ChannelType = "Independent", sweep = false, ps = 0:.01:.5)
+function check_induced_channel(S, pz; ChannelType = "Independent", sweep = false, ps = 0:.01:.5, customP = nothing)
 # Build tableau/logicals
     H, Lx, Lz, G = QECInduced.tableau_from_stabilizers(S)
 
@@ -133,21 +156,30 @@ function check_induced_channel(S, pz; ChannelType = "Independent", sweep = false
         # pbar, hb = Induced.induced_channel_and_hashing_bound(H, Lx, Lz, G, ((1-pz), pz/3, pz/3, pz/3))
         if sweep == true 
             step = round(Float64(ps.step), digits=5)
-            grid = QECInduced.sweep_independent_grid(H, Lx, Lz, G; p_min=ps[1], p_max=ps[end], step=step, threads=Threads.nthreads())
+            grid = QECInduced.sweep_independent_grid(H, Lx, Lz, G; p_min=ps[1], p_max=ps[end]+step, step=step, threads=0)
             return grid[:,2]
         else 
             hb = Induced.induced_channel_and_hashing_bound(H, Lx, Lz, G, ((1-pz), pz/3, pz/3, pz/3))
             return hb
         end 
-    else
+    elseif ChannelType == "Independent"
         # pbar, hb = Induced.induced_channel_and_hashing_bound(H, Lx, Lz, G, ((1-pz)*(1-pz), (1-pz)*pz, pz*(1-pz), pz*pz))
 #        grid = QECInduced.sweep_independent_grid(H, Lx, Lz, G; p_min=0.0, p_max=0.5, step=step, threads=4)
         if sweep == true 
             step = round(Float64(ps.step), digits=5)
-            grid = QECInduced.sweep_independent_grid(H, Lx, Lz, G; p_min=ps[1], p_max=ps[end], step=step, threads=Threads.nthreads())
+            grid = QECInduced.sweep_independent_grid(H, Lx, Lz, G; p_min=ps[1], p_max=ps[end]+step, step=step, threads=0)
             return grid[:,2]
         else 
             hb = Induced.induced_channel_and_hashing_bound(H, Lx, Lz, G, ((1-pz)*(1-pz), (1-pz)*pz, pz*(1-pz), pz*pz))
+            return hb
+        end
+    else # Custom 
+        if sweep == true 
+            step = round(Float64(ps.step), digits=5)
+            grid = QECInduced.sweep_custom_grid(H, Lx, Lz, G, customP; p_min=ps[1], p_max=ps[end]+step, step=step, threads=0)
+            return grid[:,2]
+        else 
+            hb = Induced.induced_channel_and_hashing_bound(H, Lx, Lz, G, customP)
             return hb
         end
     end

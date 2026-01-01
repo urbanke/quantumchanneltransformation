@@ -98,7 +98,7 @@ function valid_code(S::AbstractMatrix{Bool})
 end 
 
 
-function build_from_bits(S)
+function build_from_bits(S::AbstractMatrix{Bool})
     k = size(S,1)
     n = div(size(S,2),2) 
     Xs = S[:,1:n]
@@ -117,7 +117,6 @@ function build_from_bits(S)
                 tempString = tempString*"I" 
             end
         end
-        println(tempString)
         push!(StabString, tempString)
     end 
     return StabString

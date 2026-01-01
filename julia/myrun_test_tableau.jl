@@ -29,16 +29,29 @@ using QECInduced, .Symplectic
 #3,1 code found for independent channel (through DFS) 
 CHANNEL = "Independent"
 Stabilizers = ["IXX", "ZXI"]
+Stabilizers = ["ZIIIZ", "IZIIZ", "IIZZI", "IIIZZ"]
+
+#Stabilizers = ["IZXXX", "ZIXIX", "IIXXI"]
+#Stabilizers = ["ZZXII", "ZIIXX", "IIXXI"]
+#Stabilizers = ["ZIIXX", "IZIIX", "IIZXI"]
+#Stabilizers = ["XIIXX", "IXIXX", "IIXXI"]
 #CHANNEL = "Depolarizing"
+
 
 S = Symplectic.build_from_stabs(Stabilizers)
 @show S
-
 # Ensure it's a plain Bool matrix
 S = Matrix{Bool}(S)
 
 # Build tableau/logicals
 H, Lx, Lz, G = QECInduced.tableau_from_stabilizers(S)
+
+#H  = Bool[0 0 0 1 1 1 0 0 0 0;0 0 0 0 1 0 1 0 0 0;0 0 0 1 0 0 0 1 0 0]
+#Lx = Bool[0 0 0 1 0 0 0 0 0 0;0 0 0 0 1 0 0 0 0 0]
+#Lz = Bool[1 0 1 0 0 0 0 0 1 0;1 1 0 0 0 0 0 0 0 1]
+#G =  Bool[1 0 0 0 0 0 0 0 0 0;0 1 0 0 0 0 0 0 0 0;0 0 1 0 0 0 0 0 0 0]
+
+
 
 @show size(H)  # (r, 2n)
 @show size(Lx) # (k, 2n)
@@ -54,8 +67,9 @@ H, Lx, Lz, G = QECInduced.tableau_from_stabilizers(S)
 @show Symplectic.sanity_check(H, Lx, Lz, G)
 
 # Channel parameter
-px = 0.11002786443835955
-pz = px 
+#px = 0.11002786443835955
+px = 0.24178562897659914
+pz = px/9
 @show px,pz
 
 # Single-qubit Pauli channel tuple (pI, pX, pZ, pY)
@@ -66,6 +80,8 @@ else
     # Independent X/Z flips: [(1-p)^2, p(1-p), p(1-p), p^2]
     p_channel = [(1 - px) * (1 - pz), px * (1 - pz), pz * (1 - px), px * pz]
 end
+
+
 
 @show p_channel
 
