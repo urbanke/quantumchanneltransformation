@@ -305,22 +305,14 @@ function iterate_standard_block_matrices_optimized(n::Int, k::Int; r::Union{Int,
 end
 
 
-function split_trials(n,k,r,trials)
-
-    r_range = if r === nothing
-        0:s
-    else
-        @assert 0 ≤ r ≤ s "Require 0 ≤ r ≤ n-k"
-        r:r
-    end
-
+function split_trials(n,k,r_range,trials)
 
     r_range_holder = zeros(length(r_range))
     i = 1 
     for R in r_range
         r_range_holder[i] = count_standard_block_matrices(n, k; r = R)
-        if total_matrices == 0 
-            total_matrices = trials # overflow protection 
+        if r_range_holder[i] == 0 
+            r_range_holder[i] = trials # overflow protection 
         end 
         i+=1
     end 
@@ -328,7 +320,7 @@ function split_trials(n,k,r,trials)
     r_range_holder = r_range_holder./(sum(r_range_holder))
     # proportionally allocate trials 
     r_range_holder = r_range_holder .* trials 
-    return r_range_holder
+    return round.(r_range_holder)
 end 
 
 
@@ -473,7 +465,6 @@ function count_standard_block_matrices(n::Int, k::Int; r::Union{Int,Nothing}=not
         s1 = n - k - r_val
         # bits = number of variable entries for this r
         bits = s1*r_val + k*r_val + r_val*r_val + s1*r_val + k*r_val + s1*r_val + s1*k
-        println(bits)
         total += 2^bits
     end
     return total
@@ -930,7 +921,7 @@ function compare_enumeration_methods(n, k)
 end
 
 
-function printCodes(base_grid, pz_range, s_best, hashing)
+function printCodes(base_grid, points, pz_range, s_best, hashing)
     open("hashing_bound_envelope.txt", "w") do file
         for i in 1:points
             if base_grid[i] > hashing[i]
@@ -962,12 +953,18 @@ function envelope_finder(n_range, ChannelType; pz = nothing, customP = nothing, 
         for n in n_range
             for k in 1:(n-1)
                 elapsed_time_internal = @elapsed begin
-                    if randomSearch 
+                    base_trials = count_standard_block_matrices(n, k) 
+                    if base_trials == 0 
+                        base_trials = trials 
+                    end 
+                    if randomSearch && (base_trials > trials)
+                        println("Using Random Search")
                         best_grid, S_grid = All_Codes_Random(ChannelType, n, k; customP = customP, points = points, δ = δ, newBest = best_grid, trials = trials, rng = rng)
                         improve_indices = findall(best_grid .> base_grid)
                         s_best[improve_indices] = S_grid[improve_indices]
                         base_grid = max.(base_grid,best_grid)
                     else 
+                        println("Using Iterative Search")
                         best_grid, S_grid = All_Codes_DFS_parallel(ChannelType, n, k; customP = customP, points = points, δ = δ, newBest = best_grid)
                         improve_indices = findall(best_grid .> base_grid)
                         s_best[improve_indices] = S_grid[improve_indices]
@@ -975,7 +972,7 @@ function envelope_finder(n_range, ChannelType; pz = nothing, customP = nothing, 
                     end
                 end 
                 println("Elapsed time: $elapsed_time_internal seconds") 
-                printCodes(base_grid, pz_range, s_best, hashing)
+                printCodes(base_grid, points, pz_range, s_best, hashing)
             end
          end
     end
@@ -1006,12 +1003,6 @@ function envelope_finder(n_range, ChannelType; pz = nothing, customP = nothing, 
     outfile = "hashing_bound_envelope.png"
     savefig(plt, outfile)
     println("Saved plot to $(outfile)")
-
-
-
-
-
-
     return hashing, base_grid, s_best
 end
 
@@ -1038,8 +1029,8 @@ end
 
 function main()
     ChannelType = "X by 9" 
-    n_range = [3,5,7,9,11] 
-    hashing, base_grid, s_best = envelope_finder(n_range, ChannelType; customP = ninexz, randomSearch = true, trials = 100000)
+    n_range = [3,5] 
+    hashing, base_grid, s_best = envelope_finder(n_range, ChannelType; customP = ninexz, randomSearch = true, trials = 1e8)
 
 end
 
