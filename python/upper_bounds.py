@@ -1,4 +1,4 @@
-# [>-] Upper bounds for qubit Pauli channels + plotting
+# [>-] upper_bounds.py  (UPDATED: saves plots as PNG + optional show)
 # Bounds included:
 #  - EA/2 upper bound (all channels)
 #  - Entanglement-breaking (EB) => Q=0 test (all channels; returns 0 or inf)
@@ -9,10 +9,14 @@
 #       * BB84 symmetric
 #       * depolarizing
 # Plotting:
-#  - Plots all available bounds for each channel on same figure.
+#  - Saves each plot as a PNG (default into ./plots/)
+#  - Optionally shows plots interactively (plt.show())
 
+import os
 import numpy as np
 import math
+import matplotlib
+matplotlib.use("Agg")   # non-GUI backend (saves PNGs fine)
 import matplotlib.pyplot as plt
 
 # --------------------------
@@ -248,7 +252,6 @@ def epsilon_degradable_pauli(pI, pX, pY, pZ, solver="SCS", verbose=False):
     """
     Compute ε ≈ inf_D || Φ^c - D∘Φ ||_⋄ for a qubit Pauli channel via an SDP (cvxpy).
     This is expensive; use a coarse grid.
-
     Requires: cvxpy installed.
     """
     import cvxpy as cp
@@ -354,7 +357,6 @@ def ub_bb84_ad_sym(p_grid, eps_grid):
 # --------------------------
 def build_p_grid(p_min=0.0, p_max=0.25, p_step=0.01):
     p = np.arange(p_min, p_max + 0.5*p_step, p_step, dtype=float)
-    # ensure strictly increasing unique (convex hull assumes increasing)
     p = np.unique(np.clip(p, 0.0, 1.0))
     p.sort()
     if len(p) < 3:
@@ -362,11 +364,6 @@ def build_p_grid(p_min=0.0, p_max=0.25, p_step=0.01):
     return p
 
 def evaluate_bounds(p_min=0.0, p_max=0.25, p_step=0.01, compute_eps=False, eps_solver="SCS"):
-    """
-    Returns:
-      p_grid
-      bounds dict with arrays for each bound
-    """
     p = build_p_grid(p_min, p_max, p_step)
 
     # Probabilities for the three channels
@@ -381,15 +378,15 @@ def evaluate_bounds(p_min=0.0, p_max=0.25, p_step=0.01, compute_eps=False, eps_s
     bounds["EA/2_dep"] = ub_entanglement_assisted_half(pI_dep, pX_dep, pY_dep, pZ_dep)
     bounds["EA/2_skw"] = ub_entanglement_assisted_half(pI_skw, pX_skw, pY_skw, pZ_skw)
 
-    # EB (all): returns 0 when EB triggers, else inf
+    # EB (all)
     bounds["EB_ind"] = ub_entanglement_breaking_cutoff(pI_ind, pX_ind, pY_ind, pZ_ind)
     bounds["EB_dep"] = ub_entanglement_breaking_cutoff(pI_dep, pX_dep, pY_dep, pZ_dep)
     bounds["EB_skw"] = ub_entanglement_breaking_cutoff(pI_skw, pX_skw, pY_skw, pZ_skw)
 
     # SSC closed-form bounds (where available)
-    bounds["SSC_ind"] = ub_bb84_ssc_sym(p)      # independent symmetric
-    bounds["SSC_dep"] = ub_depolarizing_ssc(p)  # depolarizing
-    bounds["SSC_skw"] = np.full_like(p, np.nan) # not implemented (skewed-specific closed form not in this script)
+    bounds["SSC_ind"] = ub_bb84_ssc_sym(p)
+    bounds["SSC_dep"] = ub_depolarizing_ssc(p)
+    bounds["SSC_skw"] = np.full_like(p, np.nan)  # not implemented for skewed here
 
     # AD bounds (optional; heavy)
     if compute_eps:
@@ -403,7 +400,7 @@ def evaluate_bounds(p_min=0.0, p_max=0.25, p_step=0.01, compute_eps=False, eps_s
 
         bounds["AD_ind"] = ub_bb84_ad_sym(p, eps_ind)
         bounds["AD_dep"] = ub_depolarizing_ad(p, eps_dep)
-        bounds["AD_skw"] = np.full_like(p, np.nan)  # not specialized here
+        bounds["AD_skw"] = np.full_like(p, np.nan)
     else:
         bounds["AD_ind"] = np.full_like(p, np.nan)
         bounds["AD_dep"] = np.full_like(p, np.nan)
@@ -414,32 +411,40 @@ def evaluate_bounds(p_min=0.0, p_max=0.25, p_step=0.01, compute_eps=False, eps_s
         stack = []
         for a in arrs:
             a = np.asarray(a, dtype=float)
-            a = np.where(np.isfinite(a), a, np.inf)  # nan/inf won't win
+            a = np.where(np.isfinite(a), a, np.inf)
             stack.append(a)
         return np.min(np.vstack(stack), axis=0)
 
     bounds["tight_ind"] = tightest(bounds["EA/2_ind"], bounds["EB_ind"], bounds["SSC_ind"], bounds["AD_ind"])
     bounds["tight_dep"] = tightest(bounds["EA/2_dep"], bounds["EB_dep"], bounds["SSC_dep"], bounds["AD_dep"])
-    bounds["tight_skw"] = tightest(bounds["EA/2_skw"], bounds["EB_skw"])  # add more if you extend
+    bounds["tight_skw"] = tightest(bounds["EA/2_skw"], bounds["EB_skw"])
 
     return p, bounds
 
 # --------------------------
-# Plotting
+# Plotting + SAVING
 # --------------------------
 def _mask_inf_nan(y):
     y = np.asarray(y, dtype=float)
-    y = np.where(np.isfinite(y), y, np.nan)
-    return y
+    return np.where(np.isfinite(y), y, np.nan)
 
-def plot_bounds(p, B, title_prefix="Upper bounds"):
+def plot_bounds(
+    p,
+    B,
+    title_prefix="Upper bounds",
+    save_dir="plots",
+    save_prefix="upper_bounds",
+    dpi=200,
+    show_plots=False,
+):
     """
-    Makes 3 figures: independent-symmetric, depolarizing, skewed.
-    Each figure plots available bounds and the tightest computed.
+    Creates 3 figures (ind/dep/skw), saves them as PNGs into save_dir,
+    and optionally shows them.
     """
-    # Helper to plot one channel
+    os.makedirs(save_dir, exist_ok=True)
+
     def plot_one(tag, name):
-        plt.figure(figsize=(8, 5))
+        fig = plt.figure(figsize=(8, 5))
         plt.title(f"{title_prefix}: {name}")
         plt.xlabel("p")
         plt.ylabel("Upper bound on Q (qubits/use)")
@@ -454,12 +459,14 @@ def plot_bounds(p, B, title_prefix="Upper bounds"):
         plt.plot(p, eb_plot, label="EB => 0")
 
         # SSC if available
-        if np.any(np.isfinite(_mask_inf_nan(B.get(f"SSC_{tag}", np.nan)))):
-            plt.plot(p, _mask_inf_nan(B[f"SSC_{tag}"]), label="SSC (conv envelope)")
+        ssc_key = f"SSC_{tag}"
+        if ssc_key in B and np.any(np.isfinite(_mask_inf_nan(B[ssc_key]))):
+            plt.plot(p, _mask_inf_nan(B[ssc_key]), label="SSC (conv envelope)")
 
         # AD if available
-        if np.any(np.isfinite(_mask_inf_nan(B.get(f"AD_{tag}", np.nan)))):
-            plt.plot(p, _mask_inf_nan(B[f"AD_{tag}"]), label="AD (via SDP eps)")
+        ad_key = f"AD_{tag}"
+        if ad_key in B and np.any(np.isfinite(_mask_inf_nan(B[ad_key]))):
+            plt.plot(p, _mask_inf_nan(B[ad_key]), label="AD (via SDP eps)")
 
         # Tightest computed
         plt.plot(p, _mask_inf_nan(B[f"tight_{tag}"]), linestyle="--", label="tightest among computed")
@@ -468,27 +475,53 @@ def plot_bounds(p, B, title_prefix="Upper bounds"):
         plt.legend()
         plt.tight_layout()
 
-    plot_one("ind", "Independent (px=pz=p)")
-    plot_one("dep", "Depolarizing (p)")
-    plot_one("skw", "Skewed independent (px=p, pz=p/9)")
-    plt.show()
+        out_path = os.path.join(save_dir, f"{save_prefix}_{tag}.png")
+        fig.savefig(out_path, dpi=dpi, bbox_inches="tight")
+        print(f"[saved] {out_path}")
+
+        return fig
+
+    figs = []
+    figs.append(plot_one("ind", "Independent (px=pz=p)"))
+    figs.append(plot_one("dep", "Depolarizing (p)"))
+    figs.append(plot_one("skw", "Skewed independent (px=p, pz=p/9)"))
+
+    if show_plots:
+        plt.show()
+    else:
+        # If not showing, close to avoid GUI backend requirements / memory accumulation
+        for fig in figs:
+            plt.close(fig)
 
 # --------------------------
-# Example usage
+# Main
 # --------------------------
 if __name__ == "__main__":
-    # Change these as needed:
-    p_min = 0.0
-    p_max = 0.25
-    p_step = 0.01
+    # Coarse grid defaults (change as needed)
+    p_min = 0.1
+    p_max = 0.3
+    p_step = 0.02
 
     # Turn on SDP-based AD bounds (slow; requires cvxpy):
-    compute_eps = False
-    eps_solver = "SCS"  # try "SCS" first
+    compute_eps = True 
+    eps_solver = "SCS"
+
+    # Plot saving
+    save_dir = "plots"
+    dpi = 200
+    show_plots = False   # set False if running headless (SSH / no GUI)
 
     p_grid, bounds = evaluate_bounds(
         p_min=p_min, p_max=p_max, p_step=p_step,
         compute_eps=compute_eps, eps_solver=eps_solver
     )
 
-    plot_bounds(p_grid, bounds, title_prefix="Upper bounds (coarse grid)")
+    plot_bounds(
+        p_grid, bounds,
+        title_prefix="Upper bounds (coarse grid)",
+        save_dir=save_dir,
+        save_prefix="upper_bounds",
+        dpi=dpi,
+        show_plots=show_plots,
+    )
+
