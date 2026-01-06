@@ -125,6 +125,9 @@ Returns a 2-column matrix `[p  induced_hashing_bound 1-h(p)]`.
 sweep_custom_grid(H, Lx, Lz, G, customP; p_min=0.0, p_max=1.0, step=0.01, threads=Threads.nthreads()) =
     ParallelSweep.sweep_custom_grid(H, Lx, Lz, G, customP; p_min, p_max, step, threads)
 
+sweep_custom_grid_exact(H, Lx, Lz, G, ps, customP; depolarizing=false, independent=false, threads::Int=Threads.nthreads()) =
+    ParallelSweep.sweep_custom_grid_exact(H, Lx, Lz, G, ps, customP; depolarizing, independent, threads) 
+
 
 """
     sweep_hashing_grid(ps,  ChannelType; customP = nothing))
@@ -145,29 +148,25 @@ sweep_hashing_grid(ps,  ChannelType; customP = nothing) =
 Takes in a list of stabilizers, as well as the ChannelType (currently only Depolarizing or Independent). If there is a moment where the induced channel is both better than 0 AND H(p_channel), it returns true
 Stabilizer must be in boolean form not XYZ form. 
 """
-function check_induced_channel(S, pz; ChannelType = "Independent", sweep = false, ps = 0:.01:.5, customP = nothing)
-# Build tableau/logicals
+function check_induced_channel(S, pz; ChannelType = "Independent", sweep = false, ps = 0:.01:.5, customP = nothing, threads = Threads.nthreads())
+    # Build tableau/logicals
     H, Lx, Lz, G = QECInduced.tableau_from_stabilizers(S)
-
-# check that each of H, Lx, Lz, G commute within themselves
+    # check that each of H, Lx, Lz, G commute within themselves
     @assert(Symplectic.sanity_check(H,Lx,Lz,G) == true, "Error Constructing Tableau")
-
+    
     if ChannelType == "Depolarizing"
-        # pbar, hb = Induced.induced_channel_and_hashing_bound(H, Lx, Lz, G, ((1-pz), pz/3, pz/3, pz/3))
         if sweep == true 
-            step = round(Float64(ps.step), digits=5)
-            grid = QECInduced.sweep_independent_grid(H, Lx, Lz, G; p_min=ps[1], p_max=ps[end]+step, step=step, threads=0)
+            # Use ps directly instead of reconstructing the range
+            grid = QECInduced.sweep_custom_grid_exact(H, Lx, Lz, G, ps, customP; depolarizing=true, threads = Threads.nthreads())
             return grid[:,2]
         else 
             hb = Induced.induced_channel_and_hashing_bound(H, Lx, Lz, G, ((1-pz), pz/3, pz/3, pz/3))
             return hb
         end 
     elseif ChannelType == "Independent"
-        # pbar, hb = Induced.induced_channel_and_hashing_bound(H, Lx, Lz, G, ((1-pz)*(1-pz), (1-pz)*pz, pz*(1-pz), pz*pz))
-#        grid = QECInduced.sweep_independent_grid(H, Lx, Lz, G; p_min=0.0, p_max=0.5, step=step, threads=4)
         if sweep == true 
-            step = round(Float64(ps.step), digits=5)
-            grid = QECInduced.sweep_independent_grid(H, Lx, Lz, G; p_min=ps[1], p_max=ps[end]+step, step=step, threads=0)
+            # Use ps directly instead of reconstructing the range
+            grid = QECInduced.sweep_custom_grid_exact(H, Lx, Lz, G, ps, customP; independent=true, threads = Threads.nthreads())
             return grid[:,2]
         else 
             hb = Induced.induced_channel_and_hashing_bound(H, Lx, Lz, G, ((1-pz)*(1-pz), (1-pz)*pz, pz*(1-pz), pz*pz))
@@ -175,16 +174,15 @@ function check_induced_channel(S, pz; ChannelType = "Independent", sweep = false
         end
     else # Custom 
         if sweep == true 
-            step = round(Float64(ps.step), digits=5)
-            grid = QECInduced.sweep_custom_grid(H, Lx, Lz, G, customP; p_min=ps[1], p_max=ps[end]+step, step=step, threads=0)
+            # Use ps directly instead of reconstructing the range
+            grid = QECInduced.sweep_custom_grid_exact(H, Lx, Lz, G, ps, customP, threads = Threads.nthreads())
             return grid[:,2]
         else 
             hb = Induced.induced_channel_and_hashing_bound(H, Lx, Lz, G, customP)
             return hb
         end
     end
-    #return hb
-end  
+end
 
 
 """

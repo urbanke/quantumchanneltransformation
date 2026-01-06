@@ -483,7 +483,7 @@ Returns:
 - S_best: Best stabilizer matrix found
 - r_best: The r value that gave the best result
 """
-function All_Codes_DFS(ChannelType, n, k; pz=nothing, r_specific=nothing, points=15, customP=nothing, δ = .3)
+function All_Codes_DFS(ChannelType, n, k; pz=nothing, r_specific=nothing, points=15, customP=nothing, δ = .3, newBest = nothing)
     s = n - k  # Number of rows in the (n-k) × (2n) matrix
     
     # Initialize best trackers for each grid point
@@ -495,8 +495,13 @@ function All_Codes_DFS(ChannelType, n, k; pz=nothing, r_specific=nothing, points
     if pz === nothing 
         pz = findZeroRate(f, 0, 0.5; maxiter=1000, ChannelType=ChannelType, customP=customP)
     end 
-    pz_range = range(pz - δ*pz, pz + δ*pz, length=points)    
-    hb_best = QECInduced.sweep_hashing_grid(pz_range, ChannelType; customP = customP)
+    pz_range = range(pz - δ*pz, pz + δ*pz, length=points)
+
+    if newBest === nothing 
+        hb_best = QECInduced.sweep_hashing_grid(pz_range, ChannelType; customP = customP)
+    else 
+        hb_best = newBest
+    end 
 
 
     println("=" ^ 70)
@@ -613,7 +618,7 @@ To use threading, start Julia with: `julia -t auto` or `julia -t 8` (for 8 threa
 Check available threads with: `Threads.nthreads()`
 """
 
-function All_Codes_DFS_parallel(ChannelType, n, k; pz=nothing, use_threads=true, points = 15, customP = nothing, δ = .3)
+function All_Codes_DFS_parallel(ChannelType, n, k; pz=nothing, use_threads=true, points = 15, customP = nothing, δ = .3, newBest = nothing)
     s = n - k
     
     if pz === nothing 
@@ -647,7 +652,7 @@ function All_Codes_DFS_parallel(ChannelType, n, k; pz=nothing, use_threads=true,
             r_val = r_values[i]
             println("Thread $(Threads.threadid()): Starting r=$r_val")
             
-            hb, S, r = All_Codes_DFS(ChannelType, n, k; pz=pz, r_specific=r_val, customP = customP, δ = δ)
+            hb, S, r = All_Codes_DFS(ChannelType, n, k; pz=pz, r_specific=r_val, customP = customP, δ = δ, newBest = newBest)
             results[i] = (r=r_val, hb=hb, S=S)
             
             println("Thread $(Threads.threadid()): Completed r=$r_val, hb=$hb")
@@ -659,13 +664,17 @@ function All_Codes_DFS_parallel(ChannelType, n, k; pz=nothing, use_threads=true,
             r_val = r_values[i]
             println("\n--- Starting search for r=$r_val ---")
             
-            hb, S, r = All_Codes_DFS(ChannelType, n, k; pz=pz, r_specific=r_val, points = points, customP = customP, δ = δ)
+            hb, S, r = All_Codes_DFS(ChannelType, n, k; pz=pz, r_specific=r_val, points = points, customP = customP, δ = δ, newBest = newBest)
             results[i] = (r=r_val, hb=hb, S=S)
         end
     end
-    total_best = QECInduced.sweep_hashing_grid(pz_range, ChannelType; customP = customP)
+    if newBest === nothing 
+        total_best = QECInduced.sweep_hashing_grid(pz_range, ChannelType; customP = customP)
+    else 
+        total_best = newBest
+    end 
     for i in 1:n_r 
-        replaceIndices = findall(results[i].hb .> total_best)
+        replaceIndices = findall(results[i].hb .>= total_best)
         s_best[replaceIndices] = (results[i].S)[replaceIndices]
         total_best = max.(total_best, results[i].hb)
     end
@@ -813,6 +822,7 @@ function envelope_finder(n_range, ChannelType; pz = nothing, customP = nothing, 
     pz_range = range(pz - δ*pz, pz + δ*pz, length=points)
 
     hashing = QECInduced.sweep_hashing_grid(pz_range, ChannelType; customP = customP)
+    best_grid = copy(hashing)
     println(hashing)
     base_grid = copy(hashing)
     s_best = Vector{Any}(undef, points)
@@ -820,7 +830,7 @@ function envelope_finder(n_range, ChannelType; pz = nothing, customP = nothing, 
         for n in n_range
             for k in 1:(n-1)
                 elapsed_time_internal = @elapsed begin
-                    best_grid, S_grid = All_Codes_DFS_parallel(ChannelType, n, k; customP = customP, points = points, δ = δ)
+                    best_grid, S_grid = All_Codes_DFS_parallel(ChannelType, n, k; customP = customP, points = points, δ = δ, newBest = best_grid)
                     improve_indices = findall(best_grid .> base_grid)
                     s_best[improve_indices] = S_grid[improve_indices]
                     base_grid = max.(base_grid,best_grid)
@@ -898,7 +908,7 @@ end
 
 function main()
     ChannelType = "X by 9" 
-    n_range = [3] 
+    n_range = [3,5] 
     hashing, base_grid, s_best = envelope_finder(n_range, ChannelType; customP = ninexz)
 
 end

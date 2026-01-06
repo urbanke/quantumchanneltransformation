@@ -511,7 +511,7 @@ Returns:
 - S_best: Best stabilizer matrix found
 - r_best: The r value that gave the best result
 """
-function All_Codes_DFS(ChannelType, n, k; pz=nothing, r_specific=nothing, points=15, customP=nothing, δ = .3, newBest = nothing)
+function All_Codes_DFS(ChannelType, n, k; pz=nothing, r_specific=nothing, points=15, customP=nothing, δ = .3, newBest = nothing, threads = Threads.nthreads())
     s = n - k  # Number of rows in the (n-k) × (2n) matrix
     
     # Initialize best trackers for each grid point
@@ -523,13 +523,15 @@ function All_Codes_DFS(ChannelType, n, k; pz=nothing, r_specific=nothing, points
     if pz === nothing 
         pz = findZeroRate(f, 0, 0.5; maxiter=1000, ChannelType=ChannelType, customP=customP)
     end 
-    pz_range = range(pz - δ*pz, pz + δ*pz, length=points)    
+    pz_range = range(pz - pz*δ/2, pz + pz*δ/4, length=points)   
+    pz_range = range(.236,.272, length=points)
+ 
     if newBest === nothing 
         hb_best = QECInduced.sweep_hashing_grid(pz_range, ChannelType; customP = customP)
     else 
         hb_best = newBest
     end 
-
+    println(hb_best)
     println("=" ^ 70)
     println("Generating binary matrices ($s × $(2*n)) in standard block form")
     println("Parameters: n=$n, k=$k, s=$s, grid_points=$points")
@@ -562,10 +564,10 @@ function All_Codes_DFS(ChannelType, n, k; pz=nothing, r_specific=nothing, points
         S = Matrix{Bool}(info.M)
         
         # Check the induced channel at all grid points
-        hb_grid = QECInduced.check_induced_channel(S, pz; ChannelType=ChannelType, sweep=true, ps=pz_range, customP=customP)
-        
+        hb_grid = QECInduced.check_induced_channel(S, pz; ChannelType=ChannelType, sweep=true, ps=pz_range, customP=customP, threads = threads)
         # Find which grid points improved
         improved_indices = findall(hb_grid .> (hb_best .+ eps()))
+
         
         # Update best for each improved point
         if !isempty(improved_indices)
@@ -586,7 +588,6 @@ function All_Codes_DFS(ChannelType, n, k; pz=nothing, r_specific=nothing, points
             println(Symplectic.build_from_bits(S_best[improved_indices[1]]))
             println("=" ^ 70 * "\n")
         end
-        
     end
     
     println("\n" * "=" ^ 70)
@@ -600,36 +601,6 @@ function All_Codes_DFS(ChannelType, n, k; pz=nothing, r_specific=nothing, points
     for r_val in sort(collect(keys(count_by_r)))
         println("  r=$r_val: $(count_by_r[r_val]) matrices checked")
     end
-    
-    #=
-    println("\n" * "=" ^ 70)
-    println("BEST RESULTS BY GRID POINT")
-    println("=" ^ 70)
-    for i in 1:points
-        println("Point $i: pz=$(round(pz_range[i], digits=4)) | hb=$(round(hb_best[i], digits=6)) | r=$(r_best[i])")
-    end
-    
-    # Check if same code is best across multiple points
-    unique_codes = unique(S_best)
-    println("\n" * "=" ^ 70)
-    println("CODE DIVERSITY")
-    println("=" ^ 70)
-    println("Unique best codes: $(length(unique_codes)) out of $points grid points")
-    
-    # Group grid points by which code is best
-    if length(unique_codes) < points
-        println("\nGrid points sharing the same best code:")
-        for (code_idx, code) in enumerate(unique_codes)
-            matching_points = findall(s -> s == code, S_best)
-            if length(matching_points) > 1
-                println("  Code $code_idx is best at points: $matching_points")
-            end
-        end
-    end
-    
-    println("=" ^ 70)
-    =# 
-
     return hb_best, S_best, r_best
 end
 
@@ -665,7 +636,9 @@ function All_Codes_Random(ChannelType, n, k; pz=nothing, r_specific=nothing, poi
     if pz === nothing 
         pz = findZeroRate(f, 0, 0.5; maxiter=1000, ChannelType=ChannelType, customP=customP)
     end 
-    pz_range = range(pz - δ*pz, pz + δ*pz, length=points)    
+    pz_range = range(pz - pz*δ/2, pz + pz*δ/4, length=points)   
+    pz_range = range(.236,.272, length=points)
+ 
     if newBest === nothing 
         hb_best = QECInduced.sweep_hashing_grid(pz_range, ChannelType; customP = customP)
     else 
@@ -768,8 +741,9 @@ function All_Codes_DFS_parallel(ChannelType, n, k; pz=nothing, use_threads=true,
     if pz === nothing 
         pz = findZeroRate(f, 0, 0.5; maxiter=1000, ChannelType=ChannelType, customP = customP)
     end
-    pz_range = range(pz - δ*pz, pz + δ*pz, length=points)
-
+    pz_range = range(pz - pz*δ/2, pz + pz*δ/4, length=points)   
+    pz_range = range(.236,.272, length=points)
+ 
     n_threads = Threads.nthreads()
     println("=" ^ 70)
     println("PARALLEL SEARCH: Testing each r value independently")
@@ -796,7 +770,7 @@ function All_Codes_DFS_parallel(ChannelType, n, k; pz=nothing, use_threads=true,
             r_val = r_values[i]
             println("Thread $(Threads.threadid()): Starting r=$r_val")
             
-            hb, S, r = All_Codes_DFS(ChannelType, n, k; pz=pz, r_specific=r_val, customP = customP, δ = δ, newBest = newBest)
+            hb, S, r = All_Codes_DFS(ChannelType, n, k; pz=pz, r_specific=r_val, customP = customP, δ = δ, newBest = newBest, points = points, threads = 0)
             results[i] = (r=r_val, hb=hb, S=S)
             
             println("Thread $(Threads.threadid()): Completed r=$r_val, hb=$hb")
@@ -932,33 +906,53 @@ function printCodes(base_grid, points, pz_range, s_best, hashing)
                 write(file, join(string.(s_best_point), " ") * "\n\n")
             end
         end
+        write(file, string(base_grid) * "\n")
+        write(file, "[")
+        for i in 1:(length(pz_range) - 1) 
+            write(file, string(pz_range[i]) * ",")
+        end 
+        write(file, string(pz_range[end]) * "]")
     end
 end 
 
 
 function envelope_finder(n_range, ChannelType; pz = nothing, customP = nothing, points = 15, δ = .3, randomSearch = false, trials = 1e7, rng = MersenneTwister(2025))
 
+
     if pz === nothing 
         pz = findZeroRate(f, 0, 0.5; maxiter=1000, ChannelType=ChannelType, customP = customP)
     end
+    println(pz)
 
-    pz_range = range(pz - δ*pz, pz + δ*pz, length=points)
+    pz_range = range(.236,.272, length=points)
+    #pz_range = range(pz - pz*δ/2, pz + pz*δ/4, length=points)   
+
+    for i in 1:length(pz_range)
+        print(pz_range[i])
+        print(", ")
+    end
+    println("]")
+
 
     hashing = QECInduced.sweep_hashing_grid(pz_range, ChannelType; customP = customP)
     best_grid = copy(hashing)
     println(hashing)
+    println(length(hashing))
+    println("HASHING")
     base_grid = copy(hashing)
     s_best = Vector{Any}(undef, points)
+    trials_unaltered = trials 
     elapsed_time = @elapsed begin
         for n in n_range
-            for k in 1:(n-1)
+            for k in 1:Int(floor(div(n,2)))
                 elapsed_time_internal = @elapsed begin
                     base_trials = count_standard_block_matrices(n, k) 
                     if base_trials == 0 
                         base_trials = trials 
                     end 
-                    if randomSearch && (base_trials > trials)
+                    if randomSearch && (base_trials > trials_unaltered)
                         println("Using Random Search")
+                        trials = floor(trials_unaltered/n) 
                         best_grid, S_grid = All_Codes_Random(ChannelType, n, k; customP = customP, points = points, δ = δ, newBest = best_grid, trials = trials, rng = rng)
                         improve_indices = findall(best_grid .> base_grid)
                         s_best[improve_indices] = S_grid[improve_indices]
@@ -1007,8 +1001,52 @@ function envelope_finder(n_range, ChannelType; pz = nothing, customP = nothing, 
 end
 
 
-function ninexz(x; tuple = false, plot = false ) # this is an example of customP, which gives the same one smith did 
+function ninexz(x; tuple = false, plot = false) # this is an example of customP, which gives the same one smith did 
     z = x/9
+    pI = (1-z)*(1-x) 
+    pX = x*(1-z) 
+    pZ = z*(1-x)
+    pY = z*x
+    if tuple # this should always be here, do not touch 
+        return (pI, pX, pZ, pY)
+    end
+    if plot # this is to plot different things (for example, smith plots 1-pI instead of pX despite working with pX)
+        return 1-pI 
+    end 
+    return [pI, pX, pZ, pY]
+end 
+
+
+function depolar(p; tuple = false, plot = false) # this is an example of customP, which gives the same one smith did 
+    pI = (1-p)
+    pX = p/3
+    pZ = p/3
+    pY = p/3
+    if tuple # this should always be here, do not touch 
+        return (pI, pX, pZ, pY)
+    end
+    if plot # this is to plot different things (for example, smith plots 1-pI instead of pX despite working with pX)
+        return p 
+    end 
+    return [pI, pX, pZ, pY]
+end 
+
+function twoPauli(p; tuple = false, plot = false) # this is an example of customP, which gives the same one smith did 
+    pI = (1-p)
+    pX = p/2
+    pZ = p/2
+    pY = 0.0 
+    if tuple # this should always be here, do not touch 
+        return (pI, pX, pZ, pY)
+    end
+    if plot # this is to plot different things (for example, smith plots 1-pI instead of pX despite working with pX)
+        return p
+    end 
+    return [pI, pX, pZ, pY]
+end 
+
+function indy(x; tuple = false, plot = false)
+    z = x 
     pI = (1-z)*(1-x) 
     pX = x*(1-z) 
     pZ = z*(1-x)
@@ -1029,10 +1067,11 @@ end
 
 function main()
     ChannelType = "X by 9" 
-    n_range = [3,5] 
-    hashing, base_grid, s_best = envelope_finder(n_range, ChannelType; customP = ninexz, randomSearch = true, trials = 1e8)
+    n_range = [3,5,7,11,13,15] 
+    hashing, base_grid, s_best = envelope_finder(n_range, ChannelType; customP = ninexz, randomSearch = true, trials = 1e6, points = 15)
 
 end
 
 # Run the main function
+
 main()

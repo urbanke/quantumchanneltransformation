@@ -29,7 +29,12 @@ using QECInduced, .Symplectic
 #3,1 code found for independent channel (through DFS) 
 CHANNEL = "Independent"
 Stabilizers = ["IXX", "ZXI"]
-Stabilizers = ["ZIIIZ", "IZIIZ", "IIZZI", "IIIZZ"]
+Stabilizers = ["IIIII", "IIIII", "IIIII", "IIIII"]
+Stabilizers = ["XIIIX", "IXIIX", "IIXIX", "IIIXX"]
+Stabilizers = ["ZIIIZ", "IZIIZ", "IIZZI"]
+#Stabilizers = ["ZIIIIIZ", "IZIIIIZ", "IIZIIIZ", "IIIZIIZ", "IIIIZIZ", "IIIIIZZ"]
+#Stabilizers = ["ZZIIIIIIIII", "IIZZIIIIIII", "IIIIZZIIIII", "IIIIIIZZIII", "IIIIIIIIZZI", "IIIIIIIIIZZ"]
+#Stabilizers = ["ZZIIIIIIIII", "IIZZIIIIIII", "IIIIZZIIIII", "IIIIIIZZIII", "IIIIIIIIZZI", "IIIIIIIIIZZ", "ZIIIIIIIIIZ", "IZIIIIIIIZI"]
 
 #Stabilizers = ["IZXXX", "ZIXIX", "IIXXI"]
 #Stabilizers = ["ZZXII", "ZIIXX", "IIXXI"]
@@ -68,7 +73,7 @@ H, Lx, Lz, G = QECInduced.tableau_from_stabilizers(S)
 
 # Channel parameter
 #px = 0.11002786443835955
-px = 0.24178562897659914
+px = 0.2526118511695812
 pz = px/9
 @show px,pz
 
@@ -91,18 +96,23 @@ hashing_orig = 1 - QECInduced.H(p_channel)
 
 println("\nComputing induced-channel distribution and per-syndrome hashing bound (new definition):")
 hashing_induced = QECInduced.induced_channel_and_hashing_bound(H, Lx, Lz, G, p_channel)
+
+println(hashing_induced - 0.027770847216977756)
 #@show size(pbar)
 #@show pbar
 println("Induced (per-syndrome) hashing bound returned by kernel: (k - Σ_s p(s) H(p(a',b'|s)))/n")
 @show hashing_induced
 
+elapsed_time = @elapsed begin
+
 # Grids (p vs bounds) — uses the same public sweep helpers.
 if CHANNEL == "Depolarizing"
     grid = QECInduced.sweep_depolarizing_grid(H, Lx, Lz, G; p_min = 0.0, p_max = 0.5, step = 0.01, threads = 4)
 else
-    grid = QECInduced.sweep_independent_grid(H, Lx, Lz, G; p_min = 0.0, p_max = 0.5, step = 0.01, threads = 4)
+    grid = QECInduced.sweep_independent_grid(H, Lx, Lz, G; p_min = 0.0, p_max = 0.15, step = 0.01, threads = 4)
 end
-
+end 
+println("Elapsed time: $elapsed_time seconds") 
 println("\nGrid columns are assumed as [p, hashing_bound_original, hashing_bound_induced]:")
 println("grid:\n", grid)
 
