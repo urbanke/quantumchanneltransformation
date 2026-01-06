@@ -1,3 +1,111 @@
+# Upper bounds for qubit Pauli channels (`python/upper_bounds.py`)
+
+This repository contains `upper_bounds.py` in the folder **python**, a script to **compute and plot (and save) multiple upper bounds** on the quantum capacity \(Q\) for several **single-qubit Pauli channel families**. The script generates PNG plots under `./plots/`.
+
+The script supports both:
+- **closed-form / non-SDP bounds** (fast), and
+- **SDP-based bounds** (slower), enabled by computing an approximate-degradability parameter \(\varepsilon\) using **CVXPY**.
+
+---
+
+## What the script does
+
+`upper_bounds.py` evaluates upper bounds on \(Q\) for three Pauli channel families:
+
+1. **Independent (symmetric)**: \(p_X = p_Z = p\) (hence \(p_Y = p^2\))
+2. **Depolarizing**: \(p_I = 1-p,\; p_X=p_Y=p_Z=p/3\)
+3. **Skewed independent**: \(p_X=p,\; p_Z=p/9\) (hence \(p_Y=p^2/9\))
+
+It saves three plots:
+- `plots/upper_bounds_ind.png`
+- `plots/upper_bounds_dep.png`
+- `plots/upper_bounds_skw.png`
+
+The `plots/` directory is created automatically by the script.
+
+---
+
+## Bounds implemented
+
+### Fast (no SDP)
+These run with `compute_eps = False`.
+
+- **EA/2 bound** (Entanglement-assisted / 2):
+  \[
+  Q(\mathcal N) \le 1 - \frac{1}{2} H(p_I,p_X,p_Y,p_Z),
+  \]
+  where \(H(\cdot)\) is the Shannon entropy of the Pauli error distribution.
+
+- **Entanglement-breaking (EB) cutoff**:
+  for unital qubit channels (including Pauli channels), if
+  \[
+  |\lambda_X| + |\lambda_Y| + |\lambda_Z| \le 1,
+  \]
+  then the channel is entanglement-breaking and \(Q(\mathcal N)=0\).
+  The script computes \(\lambda_X,\lambda_Y,\lambda_Z\) from \((p_I,p_X,p_Y,p_Z)\).
+
+- **SSC convex-envelope bounds (closed-form)**
+  - Implemented for **independent symmetric** (BB84-type expression)
+  - Implemented for **depolarizing**
+
+> Note: For the **skewed** independent channel, the script does not implement a special closed-form SSC curve; it will still compute EA/2 and EB (and tightest among computed).
+
+### Optional SDP-based (slow)
+These run with `compute_eps = True`.
+
+- **Approximate degradability (AD) bound**:
+  The script computes \(\varepsilon\) via an SDP (CVXPY) and plugs it into a published AD upper bound form.
+  This is implemented for:
+  - **independent symmetric** (BB84-type AD expression)
+  - **depolarizing** (depolarizing AD expression)
+
+> Performance note: the SDP is solved **once per p-grid point per channel**, so use a coarse p-grid.
+
+---
+
+## Requirements
+
+### Python
+- Python 3.10+ recommended (works on Python 3.12 as well)
+
+### Python packages 
+`python3 -m pip install numpy matplotlib cvxpy`
+
+To verify:
+
+`python3 -c "import numpy, matplotlib; print('ok')"`
+
+`python3 -c "import cvxpy as cp; print('cvxpy:', cp.__version__)"`
+
+### Solvers (important for SDPs)
+
+CVXPY calls an external solver to solve the SDP. This script defaults to:
+
+`eps_solver = "SCS"`
+
+SCS = Splitting Conic Solver (a common first-order conic solver that supports SDPs).
+
+Check which solvers CVXPY sees on your machine:
+
+`python3 -c "import cvxpy as cp; print(cp.installed_solvers())"`
+
+If SCS is missing, reinstall CVXPY or install SCS explicitly:
+`python3 -m pip install scs`
+
+### Running
+
+From the directory containing upper_bounds.py:
+
+`python3 upper_bounds.py`
+
+Then view output images:
+
+`open plots/upper_bounds_ind.png`
+
+`open plots/upper_bounds_dep.png`
+
+`open plots/upper_bounds_skw.png`
+
 # qec-induced — Induced logical channel & hashing bound (Julia + Rust)
 
 This project computes the **induced logical Pauli channel** of a stabilizer code under an **i.i.d. Pauli (depolarizing) physical channel**, and evaluates the **hashing bound**
