@@ -7,6 +7,54 @@ include("src/Symplectic.jl")
 
 using QECInduced, .Symplectic
 
+
+
+
+
+# Create the edge-pair pattern for a given i (Z at i and at n - i + 1)
+function edge_pair(n::Int, i::Int)
+    @assert 1 ≤ i ≤ n "i must be between 1 and n"
+    String([ (p == i || p == n - i + 1) ? 'Z' : 'I' for p in 1:n ])
+end
+
+# Build the full pattern vector
+function build_pattern(n::Int, k::Int)
+    @assert 1 ≤ k ≤ n "k must be between 1 and n"
+    rows = String[]
+    # First k-1 rows: symmetric Zs moving inward
+    for i in 1:k-1
+        push!(rows, edge_pair(n, i))
+    end
+    # Last row: k Zs followed by n-k Is
+    push!(rows, repeat("Z", k) * repeat("I", n - k))
+    rows
+end
+
+
+function ninexz_maker(rate, n; searchDown = false)
+    # find closest rate    
+    k = 0 
+    if searchDown
+        for i in (n-1):-1:(1) 
+            if i/n < rate 
+                k = i 
+                break 
+            end 
+        end 
+    else
+        for i in 1:(n-1) 
+            if i/n > rate 
+                k = i 
+                break 
+            end 
+        end 
+    end
+    println(k/n)
+    s = n-k 
+    # make code of the form i found 
+    return build_pattern(n,s)
+end 
+
 # Choose a code (default: 5-qubit perfect code)
 # Stabilizers = ["XZZXI", "IXZZX", "XIXZZ", "ZXIXZ"]
 # Other options you sometimes toggle:
@@ -18,8 +66,13 @@ using QECInduced, .Symplectic
 # Stabilizers = ["IYIIX", "IIIIX"]
 #Stabilizers = ["ZZIII", "ZIZII","ZIIZI", "ZIIIZ"]
 #Stabilizers = ["IIIIIIZ", "IIIIIZI", "IIIIZII", "IIZZZII", "IXZIZZZ"
+#= 
+Grid point details:
+  Point 3: pz=0.236, hb=0.037423
 
-
+S_best (showing first improved point) =
+Any["ZIIIIIIIZ", "IZIIIIIZI", "IIZIIIZII", "IIIZIZIII", "IIIIZZZZZ"]
+=#
 #7,1 repitition code (Smith Paper)
 #Stabilizers = ["ZZIIIII", "ZIZIIII","ZIIZIII", "ZIIIZII", "ZIIIIZI", "ZIIIIIZ"]
 #7,1 code found for independent channel (through DFS) 
@@ -27,15 +80,13 @@ using QECInduced, .Symplectic
 #7,5 code found for independent channel (through DFS) 
 #Stabilizers = ["IIIIIZZ", "IIIIXZI"]
 #3,1 code found for independent channel (through DFS) 
-CHANNEL = "Independent"
-Stabilizers = ["IXX", "ZXI"]
-Stabilizers = ["IIIII", "IIIII", "IIIII", "IIIII"]
-Stabilizers = ["XIIIX", "IXIIX", "IIXIX", "IIIXX"]
-Stabilizers = ["ZIIIZ", "IZIIZ", "IIZZI"]
-#Stabilizers = ["ZIIIIIZ", "IZIIIIZ", "IIZIIIZ", "IIIZIIZ", "IIIIZIZ", "IIIIIZZ"]
-#Stabilizers = ["ZZIIIIIIIII", "IIZZIIIIIII", "IIIIZZIIIII", "IIIIIIZZIII", "IIIIIIIIZZI", "IIIIIIIIIZZ"]
-#Stabilizers = ["ZZIIIIIIIII", "IIZZIIIIIII", "IIIIZZIIIII", "IIIIIIZZIII", "IIIIIIIIZZI", "IIIIIIIIIZZ", "ZIIIIIIIIIZ", "IZIIIIIIIZI"]
 
+
+Stabilizers = ["ZIZ","IZZ"]
+
+#Stabilizers = ["ZZIIIIIII", "ZIZIIIIII", "IIIZZIIII", "IIIZIZIII", "IIIIIIZZI", "IIIIIIZIZ", "XXXXXXIII", "XXXIIIXXX"]
+
+#Stabilizers = ninexz_maker(.5, 17; searchDown = false)
 #Stabilizers = ["IZXXX", "ZIXIX", "IIXXI"]
 #Stabilizers = ["ZZXII", "ZIIXX", "IIXXI"]
 #Stabilizers = ["ZIIXX", "IZIIX", "IIZXI"]
@@ -44,7 +95,7 @@ Stabilizers = ["ZIIIZ", "IZIIZ", "IIZZI"]
 
 
 S = Symplectic.build_from_stabs(Stabilizers)
-@show S
+#@show S
 # Ensure it's a plain Bool matrix
 S = Matrix{Bool}(S)
 
@@ -58,10 +109,10 @@ H, Lx, Lz, G = QECInduced.tableau_from_stabilizers(S)
 
 
 
-@show size(H)  # (r, 2n)
-@show size(Lx) # (k, 2n)
-@show size(Lz) # (k, 2n)
-@show size(G)  # (r, 2n)
+#@show size(H)  # (r, 2n)
+#@show size(Lx) # (k, 2n)
+#@show size(Lz) # (k, 2n)
+#@show size(G)  # (r, 2n)
 
 @show H
 @show Lx
@@ -69,26 +120,25 @@ H, Lx, Lz, G = QECInduced.tableau_from_stabilizers(S)
 @show G
 
 # check that each of H, Lx, Lz, G commute within themselves
-@show Symplectic.sanity_check(H, Lx, Lz, G)
+#@show Symplectic.sanity_check(H, Lx, Lz, G)
 
 # Channel parameter
-#px = 0.11002786443835955
-px = 0.2526118511695812
-pz = px/9
-@show px,pz
+p = 0.19006
 
+#p = 0.1889
+CHANNEL = "Depolarizing"
 # Single-qubit Pauli channel tuple (pI, pX, pZ, pY)
 if CHANNEL == "Depolarizing"
     # Depolarizing: [1-p, p/3, p/3, p/3]
     p_channel = [1 - p, p/3, p/3, p/3]
 else
     # Independent X/Z flips: [(1-p)^2, p(1-p), p(1-p), p^2]
-    p_channel = [(1 - px) * (1 - pz), px * (1 - pz), pz * (1 - px), px * pz]
+    p_channel = [(1 - px) * (1 - pz), px * (1 - pz), pz * (1 - px), px * pz] 
 end
 
 
 
-@show p_channel
+#@show p_channel
 
 println("\nHashing bound of the ORIGINAL physical channel (per-qubit):")
 hashing_orig = 1 - QECInduced.H(p_channel)
@@ -96,23 +146,65 @@ hashing_orig = 1 - QECInduced.H(p_channel)
 
 println("\nComputing induced-channel distribution and per-syndrome hashing bound (new definition):")
 hashing_induced = QECInduced.induced_channel_and_hashing_bound(H, Lx, Lz, G, p_channel)
-
-println(hashing_induced - 0.027770847216977756)
 #@show size(pbar)
 #@show pbar
 println("Induced (per-syndrome) hashing bound returned by kernel: (k - Σ_s p(s) H(p(a',b'|s)))/n")
 @show hashing_induced
 
-elapsed_time = @elapsed begin
 
+
+
+function inducedChannelFromRepCode(m,PI,PX,PZ,PY)
+    pizp = PI + PZ
+    pizm = PI - PZ 
+    pxyp = PX + PY 
+    pxym = PX - PY 
+    pib = 0
+    pzb = 0 
+    for i in 0:Int(floor(m/2))
+        mci = binomial(m,i) 
+        pib += mci*pizp^(m-i)*pxyp^(i) 
+        pib += mci*pizm^(m-i)*pxym^(i) 
+
+        pzb += mci*pizp^(m-i)*pxyp^(i) 
+        pzb -= mci*pizm^(m-i)*pxym^(i) 
+    end 
+    pib = pib/2 
+    pzb = pzb/2 
+    pxb = .5*(1 + (pizm + pxym)^m) - pib
+    pyb = .5*(1 - (pizm + pxym)^m) - pzb
+
+    return pib, pxb, pzb, pyb 
+end 
+
+
+
+# uncomment to simulate concatenated code # 
+# I switch PZ and PX because in theory you should do a Z code followed by an X code 
+# but if you do this we can do a Z code followed by a Z code and it is the same 
+
+
+m = 3
+
+PI, PZ, PX, PY = inducedChannelFromRepCode(m, p_channel[1], p_channel[2], p_channel[3], p_channel[4]) 
+p_channel = [PI, PX, PZ, PY] 
+
+println("\nComputing induced-channel distribution and per-syndrome hashing bound (with $m concatenation):")
+hashing_induced = QECInduced.induced_channel_and_hashing_bound(H, Lx, Lz, G, p_channel)/m
+#@show size(pbar)
+#@show pbar
+println("Induced (per-syndrome) hashing bound returned by kernel: (k - Σ_s p(s) H(p(a',b'|s)))/n")
+@show hashing_induced
+
+
+#=
 # Grids (p vs bounds) — uses the same public sweep helpers.
 if CHANNEL == "Depolarizing"
     grid = QECInduced.sweep_depolarizing_grid(H, Lx, Lz, G; p_min = 0.0, p_max = 0.5, step = 0.01, threads = 4)
 else
-    grid = QECInduced.sweep_independent_grid(H, Lx, Lz, G; p_min = 0.0, p_max = 0.15, step = 0.01, threads = 4)
+    grid = QECInduced.sweep_independent_grid(H, Lx, Lz, G; p_min = 0.0, p_max = 0.5, step = 0.01, threads = 4)
 end
-end 
-println("Elapsed time: $elapsed_time seconds") 
+
 println("\nGrid columns are assumed as [p, hashing_bound_original, hashing_bound_induced]:")
 println("grid:\n", grid)
 
@@ -146,4 +238,4 @@ plot!(plt, ps, indHB; label = "Induced (per-syndrome conditional entropy)", mark
 outfile = "hashing_bounds_vs_p.png"
 savefig(plt, outfile)
 println("Saved plot to $(outfile)")
-
+=#
