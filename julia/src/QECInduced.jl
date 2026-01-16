@@ -178,7 +178,8 @@ function check_induced_channel(S, pz; ChannelType = "Independent", sweep = false
             grid = QECInduced.sweep_custom_grid_exact(H, Lx, Lz, G, ps, customP, threads = Threads.nthreads())
             return grid[:,2]
         else 
-            hb = Induced.induced_channel_and_hashing_bound(H, Lx, Lz, G, customP)
+            channel = customP(pz, tuple = true)
+            hb = Induced.induced_channel_and_hashing_bound(H, Lx, Lz, G, channel)
             return hb
         end
     end

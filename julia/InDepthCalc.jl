@@ -5,6 +5,106 @@ using .Symplectic
 #using QECInduced
 
 
+# chat gpt code, cannot vouch for it  (this block only)
+
+function logical_pauli_from_bits(bits::Vector{Bool})
+    # bits length = 2*L, first L are X flags, next L are Z flags
+    L = div(length(bits), 2)
+    xs = bits[1:L]
+    zs = bits[L+1:2L]
+    s = IOBuffer()
+    for j in 1:L
+        if xs[j] & zs[j]
+            print(s, "Y")
+        elseif xs[j]
+            print(s, "X")
+        elseif zs[j]
+            print(s, "Z")
+        else
+            print(s, "I")
+        end
+    end
+    return String(take!(s))
+end
+
+function logical_pauli_from_index(idx::Int, lilK::Int)
+    bits = decimal_to_bin(idx, lilK)
+    return logical_pauli_from_bits(bits)
+end
+
+
+function print_induced_channel(inducedDict, PS::Real, lilK::Int; top::Int=16)
+    # Normalize
+    norm = Dict(k => v/PS for (k,v) in inducedDict)
+
+    # Sort by probability
+    items = collect(norm)
+    sort!(items, by = x -> -x[2])
+
+    println("Logical induced channel P(L | s):")
+    println("  (showing top $(min(top, length(items))) of $(length(items)))")
+    for (i,(k,p)) in enumerate(items[1:min(top, length(items))])
+        println(rpad("  " * logical_pauli_from_index(k, lilK), 12),
+                "  idx=", lpad(string(k), 4),
+                "  p=", p)
+    end
+
+    # Optional: sanity check sums to ~1
+    s = sum(values(norm))
+    println("  sum p = ", s)
+end
+
+function logical_marginal_one(inducedDict, PS::Real, lilK::Int, q::Int)
+    L = div(lilK, 2)
+    @assert 1 ≤ q ≤ L
+
+    pI = 0.0; pX = 0.0; pZ = 0.0; pY = 0.0
+
+    for (idx, w) in inducedDict
+        p = w / PS
+        bits = decimal_to_bin(idx, lilK)
+
+        x = bits[q]
+        z = bits[L + q]
+
+        if x && z
+            pY += p
+        elseif x
+            pX += p
+        elseif z
+            pZ += p
+        else
+            pI += p
+        end
+    end
+
+    # optional sanity normalization against tiny FP drift
+    s = pI + pX + pZ + pY
+    return Dict("I"=>pI/s, "X"=>pX/s, "Z"=>pZ/s, "Y"=>pY/s)
+end
+
+function print_logical_marginals(inducedDict, PS::Real, lilK::Int)
+    L = div(lilK, 2)
+    for q in 1:L
+        m = logical_marginal_one(inducedDict, PS, lilK, q)
+        println("Logical qubit $q marginal: ",
+                "I=$(m["I"]) | X=$(m["X"]) | Z=$(m["Z"]) | Y=$(m["Y"])")
+    end
+end
+
+#####
+
+function printNice(S)
+	print("[")
+	for i in 1:size(S)[1] - 1
+		print("\"")
+	    print(build_from_bits(S[i,:]))
+	    print("\", ")
+	end 
+	i = size(S)[1] 
+	println("\"",build_from_bits(S[i,:]),"\"]")
+end
+
 function build_from_bits(S)
     n = div(length(S),2) 
     Xs = S[1:n]
@@ -79,22 +179,55 @@ logicalZ = ["XIXZI","XXIIZ"]
 G = ["XIIII", "IXIII", "IIXII"]
 =# 
 
+
+
+ 
+Stabilizers = ["XIX", "IXX"]
+logicalX = ["IIX"]
+logicalZ = ["ZZZ"]
+G = ["ZII", "IZI"]
+
+
+
+
+
+#=
+
+
+
 Stabilizers = ["ZZ"]
 logicalX = ["IZ"]
 logicalZ = ["XX"]
 G = ["XI"]
-
-
-
-Stabilizers = ["ZIZ", "IZZ"]
-logicalX = ["IIZ"]
-logicalZ = ["XXX"]
-G = ["XII", "IXII"]
+=#
 #logicalX = ["IIX"]
 #logicalZ = ["XYY"]
 
 #logicalX = Bool[0,0,1,0,0,0] # IIX
 #logicalZ = Bool[1,0,0,0,1,1] # XYY
+#=
+Stabilizers = ["ZIZIIIIII", "IZZIIIIII", "IIIZIZIII", "IIIIZZIII", "IIIIIIZIZ", "IIIIIIIZZ", "XXXIIIXXX", "XXXXXXIII"]
+logicalX = ["IIIIIIXXX"]
+logicalZ = ["IIZIIZIIZ"]
+G = ["XIIIIIIII",
+"IXIIIIIII",
+"IIIXIIIII",
+"IIIIXIIII",
+"IIIIIIXII",
+"IIIIIIIXI",
+"IIZIIIIII",
+"IIIIIZIII"]
+=# 
+
+Stabilizers = ["ZIIIZ", "IZIIZ", "IIZIZ", "IIIZZ"]
+logicalX = ["IIIIZ"]
+logicalZ = ["XXXXX"]
+G = ["XIIII", "IXIII", "IIXII", "IIIXI"]
+
+Stabilizers = ["ZZZZZZ"]
+logicalX = ["IZZZZZ", "IIZZZZ", "IIIZZZ", "IIIIZZ", "IIIIIZ"]
+logicalZ = ["XXIIII", "IXXIII", "IIXXII", "IIIXXI", "IIIIXX"]
+G = ["XIIIII"]
 
 AllLogicalString = vcat(logicalX, logicalZ)
 
@@ -103,7 +236,6 @@ G = Symplectic.build_from_stabs(G)
 
 
 AllLogical = Symplectic.build_from_stabs(AllLogicalString)
-
 
 
 
@@ -144,16 +276,17 @@ global trueRepairs = trueErrorRepair(G,S)
 # Code is [Z, X , I] [I, X, X]
 
 p = 0.11002786443835955
-px = .23857142857142857
+px = 0.235
 pz = px/9
-p = 0.18892857142857142
+p = 0.1905
+p = 0.1904775
 
 #Any["IZXXX", "ZIXIX", "IIXXI"]
 
 
-pchannel = [(1-p)*(1-p), p*(1-p), p*(1-p), p*p]
-#pchannel = [(1 - px) * (1 - pz), px * (1 - pz), pz * (1 - px), px * pz] 
-pchannel = [(1-p), p/3, p/3, p/3]
+#pchannel = [(1-p)*(1-p), p*(1-p), p*(1-p), p*p]
+pchannel = [(1 - px) * (1 - pz), px * (1 - pz), pz * (1 - px), px * pz] 
+#pchannel = [(1-p), p/3, p/3, p/3]
 # calculate the probability of the syndromes 
 
 SyndromeDict = Dict() # making a dict where the 4 syndromes currently have no prob 
@@ -178,6 +311,7 @@ for i in 0:(4^n - 1) # there are 3 quaterary symbols so i will say there are 2^6
 	prob = calculateP(noise) 
 	SyndromeDict[dictNum] += prob # this is the probability of the syndrome 
 	push!(AllRecieved[dictNum], noise) # this gives all vectors relating to a certain syndrome 
+
 	#println(SyndromeDict)
 end 
 
@@ -253,9 +387,9 @@ function inducedChannel(recieved,PS, pchannel,AllLogical, repair)
 		for i in 1:lilK
 			residuals[i] = Int(Symplectic.symp_inner(error, AllLogical[i,:])) ⊻ repairs[i] # the residual when we apply the ML correction 
 		end 
-		print(build_from_bits(error), " || ")
+		#print(build_from_bits(error), " || ")
 		dictNum = bin_to_dec(residuals)
-		println("Residual Error Number: ", dictNum)
+		#println("Residual Error Number: ", dictNum)
 		# calculate num of errors 
 		prob = calculateP(error) 
 		inducedDict[dictNum] += prob
@@ -267,7 +401,7 @@ function inducedChannel(recieved,PS, pchannel,AllLogical, repair)
 		h -= inducedDict[i]*log2(inducedDict[i])
 	end
 
-	printDict(inducedDict)
+	#printDict(inducedDict)
 
 	println("Syrdome: (",repairs,"), (k - H(p(a,b|s))/n = ",(div(lilK,2)-h)/n)
  	return h*PS, inducedDictPrePS
@@ -290,13 +424,22 @@ for i in 0:r-1
 	trueErrorRep = bin_to_dec(idxPos) 
 	println("True Error Operator Applied: ", trueErrorRep)
 	h_temp, p_temp = inducedChannel(AllRecieved[i],SyndromeDict[i], pchannel,AllLogical, syndromeRepair[i])
+	print_induced_channel(p_temp, SyndromeDict[i], lilK; top=32)
+	print_logical_marginals(p_temp, SyndromeDict[i], lilK)
 	global H += h_temp
 	global totalProb = mergewith(+, totalProb, p_temp)  # Dict(:a => 1.4, :b => 1.4)
 	println()
 end
-println((div(lilK,2)-H)/n)
+
+global h_orig = 0 
+for i in 1:4 
+	global h_orig -= pchannel[i]*log2(pchannel[i])
+end 
+
+println("Original Channel: ", 1- h_orig)
+println("Induced Channel: ", (div(lilK,2)-H)/n)
 println(pchannel)
-printDict(totalProb)
+#printDict(totalProb)
 
 
 
@@ -338,9 +481,6 @@ function errorCheck(error, AllLogical, syndromeRepair, S; stringMode = true)
 	#println(residuals)
 	return degen, logical 
 end 
-
-
-
 
 
 

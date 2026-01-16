@@ -127,6 +127,53 @@ function ninexz_maker(rate, n; searchDown = false)
     return build_pattern(n,s)
 end 
 
+function depolar(p; tuple = false, plot = false) # this is an example of customP, which gives the same one smith did 
+    pI = (1-p)
+    pX = p/3
+    pZ = p/3
+    pY = p/3
+    if tuple # this should always be here, do not touch 
+        return (pI, pX, pZ, pY)
+    end
+    if plot # this is to plot different things (for example, smith plots 1-pI instead of pX despite working with pX)
+        return p 
+    end 
+    return [pI, pX, pZ, pY]
+end 
+
+function ninexz(x; tuple = false, plot = false) # this is an example of customP, which gives the same one smith did 
+    z = x/9
+    pI = (1-z)*(1-x) 
+    pX = x*(1-z) 
+    pZ = z*(1-x)
+    pY = z*x
+    if tuple # this should always be here, do not touch 
+        return (pI, pX, pZ, pY)
+    end
+    if plot # this is to plot different things (for example, smith plots 1-pI instead of pX despite working with pX)
+        return 1-pI 
+    end 
+    return [pI, pX, pZ, pY]
+end 
+
+
+function indy(x; tuple = false, plot = false)
+    z = x 
+    pI = (1-z)*(1-x) 
+    pX = x*(1-z) 
+    pZ = z*(1-x)
+    pY = z*x
+    if tuple # this should always be here, do not touch 
+        return (pI, pX, pZ, pY)
+    end
+    if plot # this is to plot different things (for example, smith plots 1-pI instead of pX despite working with pX)
+        return 1-pI 
+    end 
+    return [pI, pX, pZ, pY]
+end 
+
+
+
 # Choose a code (default: 5-qubit perfect code)
 # Stabilizers = ["XZZXI", "IXZZX", "XIXZZ", "ZXIXZ"]
 # Other options you sometimes toggle:
@@ -161,9 +208,16 @@ Stabilizers = ["ZIZIIIIII", "IZZIIIIII", "IIIZIZIII", "IIIIZZIII", "IIIIIIZIZ", 
 #Stabilizers = ["ZZ"]
 
 #Stabilizers = ["ZIIIZ", "IZIIZ", "IIZIZ", "IIIZZ"]
-#Stabilizers = ["ZIIIIIIIZ", "IZIIIIIIZ", "IIZIIIIIZ", "IIIZIIIIZ", "IIIIZIIIZ", "IIIIIZIIZ", "IIIIIIZIZ", "IIIIIIIZZ"]
-#Stabilizers = ["ZIIIZIIIIIIIIII","IZIIZIIIIIIIIII","IIZIZIIIIIIIIII","IIIZZIIIIIIIIII","IIIIIZIIIZIIIII","IIIIIIZIIZIIIII","IIIIIIIZIZIIIII","IIIIIIIIZZIIIII","IIIIIIIIIIZIIIZ","IIIIIIIIIIIZIIZ","IIIIIIIIIIIIZIZ","IIIIIIIIIIIIIZZ","XXXXXIIIIIXXXXX","XXXXXXXXXXIIIII"]
+Stabilizers = ["ZIIIIIIIZ", "IZIIIIIIZ", "IIZIIIIIZ", "IIIZIIIIZ", "IIIIZIIIZ", "IIIIIZIIZ", "IIIIIIZIZ", "IIIIIIIZZ"]
+Stabilizers = ["XXXIIIZZZ", "IIIXXXZZZ", "ZIZIIIIII", "IIIZIZIII", "IIIIIIZIZ", "IZZIIIIII", "IIIIZZIII", "IIIIIIIZZ"]
+Stabilizers = ["ZIIIZIIIIIIIIII","IZIIZIIIIIIIIII","IIZIZIIIIIIIIII","IIIZZIIIIIIIIII","IIIIIZIIIZIIIII","IIIIIIZIIZIIIII","IIIIIIIZIZIIIII","IIIIIIIIZZIIIII","IIIIIIIIIIZIIIZ","IIIIIIIIIIIZIIZ","IIIIIIIIIIIIZIZ","IIIIIIIIIIIIIZZ","XXXXXIIIIIXXXXX","XXXXXXXXXXIIIII"]
 
+Stabilizers = ["ZZZ"]
+Stabilizers = ["XIIZII", "IZZIII", "IZIZZZ", "IZIIIZ"]
+Stabilizers = ["ZIIIIIIZ", "IZIIIIIZ", "IIZIIIIZ", "IIIZIIZI", "IIIIZIZI", "IIIIIZZI"]
+Stabilizers = ["ZZZZZIIZ", "IIZZZIIZ", "IIZIZZZI", "ZZIIIZZI"]
+
+Stabilizers = ["ZZ"]
 #Stabilizers = ninexz_maker(.5, 17; searchDown = false)
 #Stabilizers = ["IZXXX", "ZIXIX", "IIXXI"]
 #Stabilizers = ["ZZXII", "ZIIXX", "IIXXI"]
@@ -176,8 +230,9 @@ Stabilizers = ["ZIZIIIIII", "IZZIIIIII", "IIIZIZIII", "IIIIZZIII", "IIIIIIZIZ", 
 #Stabilizers = ["ZIIIZ", "IZIIZ", "IIZZI"]
 #Stabilizers1 = ["XIX","IXX"]
 #Stabilizers = ["ZIIIZ", "IZIIZ", "IIZIZ", "IIIZZ"]
+
 #Stabilizers = ["ZZZZZZ"]
-Stabilizers = ["XIX", "IZI"]
+#Stabilizers = ["XIX", "IZI"]
 #Stabilizers = ["XIIX", "IXIX", "IIXX"]
 #Stabilizers1 = ["ZZZZZZ"]
 #Stabilizers1 = ["XXYZ", "XZYX", "ZIZI"]
@@ -185,10 +240,15 @@ Stabilizers = ["XIX", "IZI"]
 #Stabilizers1 = ["XYXZ", "YXZX", "YYXX"]
 #Stabilizers1 = ["ZIIIZ", "IZIIZ", "IIZIZ", "IIIZZ"]
 #Stabilizers = ["ZIIIIIIIIIIIIIZ","IZIIIIIIIIIIIIZ","IIZIIIIIIIIIIIZ","IIIZIIIIIIIIIIZ","IIIIZIIIIIIIIIZ","IIIIIZIIIIIIIIZ","IIIIIIZIIIIIIIZ","IIIIIIIZIIIIIIZ","IIIIIIIIZIIIIIZ","IIIIIIIIIZIIIIZ","IIIIIIIIIIZIIIZ","IIIIIIIIIIIZIIZ","IIIIIIIIIIIIZIZ","IIIIIIIIIIIIIZZ"]
-#Stabilizers1 = ["ZIZ", "IZZ"]
-#Stabilizers1 = ["ZIIIZ", "IZIIZ", "IIZIZ", "IIIZZ"]
+#Stabilizers = ["ZIZ", "IZZ"]
+Stabilizers = ["ZZZZZZZZZZZZZZ"]
+#Stabilizers = ["XX"]
+Stabilizers = ["ZIIIZ", "IZIIZ", "IIZIZ", "IIIZZ"]
+Stabilizers = ["ZIIZ", "IZIZ", "IIZZ"]
+#Stabilizers = ["ZZ"]
 
-#Stabilizers = concat_stabilizers_strings(Stabilizers1, Stabilizers)
+#Stabilizers = concat_stabilizers_strings(Stabilizers1, Stabilizers) # I think the first input should be bigger (i think it is the outer code)
+
 
 S = Symplectic.build_from_stabs(Stabilizers)
 #@show S
@@ -212,154 +272,35 @@ H, Lx, Lz, G = QECInduced.tableau_from_stabilizers(S)
 # check that each of H, Lx, Lz, G commute within themselves
 @show Symplectic.sanity_check(H, Lx, Lz, G)
 
-# Channel parameter
-px = 0.233
-pz = px/9
-p = 0.1905
-px = 0.1094384294502969
-p = 0.19022857142857144
-#px = 0.1094384294502969
-pz = px 
-p = 0.1904775
-CHANNEL = "Depolarizing"
+points = 50
+pz_range = range(0.18885714285714286,  0.18892857142857142, length = points)
+pz_range_override = range(0.18889285714285714, 0.19022857142857144, length = points)
+pz_range_override = range(0.233, .272, length = points)
+pz_range = range(.231, 0.232, length = points)
+pz_range = range(0.23, .25, length = points)
+
+#pz_range = range(.233, 0.234, length = points)
+pz = 0 
+
+customP = ninexz # change this 
+ChannelType = "Custom" # Dont change this 
 
 
-
-# from the [3,1] code at depolarizing p = .1905 - both the good and bad channel  (0.6673869999999998)
-pI = 0.43649999999999983
-pX =  0.43649999999999983
-pZ = 0.06349999999999997
-pY = 0.06349999999999999
-
-pI = 0.8095
-pX = 0.187430741833449
-pZ = 0.001534629083275521
-pY = 0.001534629083275521
-
-
-# pI = 0.7277731462389959
-# pX = 0.27216170306033616
-# pZ = 3.2575350335105956e-5
-# pY = 3.2575350335105956e-5
-
-
-
-
-
-#CHANNEL = "Special"
-#p = 0.1
-#CHANNEL = "Depolarizing"
-# Single-qubit Pauli channel tuple (pI, pX, pZ, pY)
-if CHANNEL == "Depolarizing"
-    # Depolarizing: [1-p, p/3, p/3, p/3]
-    p_channel = [1 - p, p/3, p/3, p/3]
-elseif CHANNEL == "Independent"
-    # Independent X/Z flips: [(1-p)^2, p(1-p), p(1-p), p^2]
-    p_channel = [(1 - px) * (1 - pz), px * (1 - pz), pz * (1 - px), px * pz] 
-else 
-    p_channel = [pI, pX, pZ, pY]
-end 
-
-
-
+hashing = QECInduced.sweep_hashing_grid(pz_range, ChannelType; customP = customP)
+hb_grid = QECInduced.check_induced_channel(S, pz; ChannelType=ChannelType, sweep=true, ps=pz_range, customP=customP, threads = 0)
 #@show p_channel
-
-println("\nHashing bound of the ORIGINAL physical channel (per-qubit):")
-hashing_orig = 1 - QECInduced.H(p_channel)
-@show hashing_orig
-
-println("\nComputing induced-channel distribution and per-syndrome hashing bound (new definition):")
-hashing_induced = QECInduced.induced_channel_and_hashing_bound(H, Lx, Lz, G, p_channel)
-#@show size(pbar)
-#@show pbar
-println("Induced (per-syndrome) hashing bound returned by kernel: (k - Σ_s p(s) H(p(a',b'|s)))/n")
-@show hashing_induced
-
-
-
-
-function inducedChannelFromRepCode(m,PI,PX,PZ,PY)
-    pizp = PI + PZ
-    pizm = PI - PZ 
-    pxyp = PX + PY 
-    pxym = PX - PY 
-    pib = 0
-    pzb = 0 
-    for i in 0:Int(floor(m/2))
-        mci = binomial(m,i) 
-        pib += mci*pizp^(m-i)*pxyp^(i) 
-        pib += mci*pizm^(m-i)*pxym^(i) 
-
-        pzb += mci*pizp^(m-i)*pxyp^(i) 
-        pzb -= mci*pizm^(m-i)*pxym^(i) 
-    end 
-    pib = pib/2 
-    pzb = pzb/2 
-    pxb = .5*(1 + (pizm + pxym)^m) - pib
-    pyb = .5*(1 - (pizm + pxym)^m) - pzb
-
-    return pib, pxb, pzb, pyb 
+print("[")
+for i in pz_range[1:end-1]
+    print(ninexz(i;plot=true), ", ")
 end 
+println(ninexz(pz_range[end];plot=true), "]")
+println(hashing)
+#println(hb_grid .- hashing)
+println(hb_grid) 
 
 
 
-# uncomment to simulate concatenated code # 
-# I switch PZ and PX because in theory you should do a Z code followed by an X code 
-# but if you do this we can do a Z code followed by a Z code and it is the same 
-#= 
 
-m = 3
 
-PI, PZ, PX, PY = inducedChannelFromRepCode(m, p_channel[1], p_channel[2], p_channel[3], p_channel[4]) 
-p_channel = [PI, PX, PZ, PY] 
 
-println("\nComputing induced-channel distribution and per-syndrome hashing bound (with $m concatenation):")
-hashing_induced = QECInduced.induced_channel_and_hashing_bound(H, Lx, Lz, G, p_channel)/m
-#@show size(pbar)
-#@show pbar
-println("Induced (per-syndrome) hashing bound returned by kernel: (k - Σ_s p(s) H(p(a',b'|s)))/n")
-@show hashing_induced
 
-=# 
-#=
-# Grids (p vs bounds) — uses the same public sweep helpers.
-if CHANNEL == "Depolarizing"
-    grid = QECInduced.sweep_depolarizing_grid(H, Lx, Lz, G; p_min = 0.0, p_max = 0.5, step = 0.01, threads = 4)
-else
-    grid = QECInduced.sweep_independent_grid(H, Lx, Lz, G; p_min = 0.0, p_max = 0.5, step = 0.01, threads = 4)
-end
-
-println("\nGrid columns are assumed as [p, hashing_bound_original, hashing_bound_induced]:")
-println("grid:\n", grid)
-
-# -----------------------------
-# Plot (p, original per-qubit bound, induced per-syndrome bound)
-# -----------------------------
-ps      = grid[:, 1]
-origHB  = grid[:, 3]  # 1 - H(p_channel) per qubit
-indHB   = grid[:, 2]  # (k - Σ_s p(s) H(· | s))/n from the updated kernel
-
-# Bring in Plots (install if missing)
-try
-    using Plots
-catch
-    import Pkg; Pkg.add("Plots"); using Plots
-end
-
-plt = plot(
-    ps, origHB;
-    label = "Original channel (per-qubit 1 - H(p))",
-    xlabel = CHANNEL * " probability p",
-    ylabel = "Hashing bound",
-    title = "Hashing bounds vs p",
-    marker = :circle,
-    linewidth = 2,
-)
-
-plot!(plt, ps, indHB; label = "Induced (per-syndrome conditional entropy)", marker = :square, linewidth = 2)
-
-# Save figure (and print the path)
-outfile = "hashing_bounds_vs_p.png"
-savefig(plt, outfile)
-println("Saved plot to $(outfile)")
-=#

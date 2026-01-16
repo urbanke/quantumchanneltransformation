@@ -4,6 +4,194 @@ using ..Symplectic: symp_inner
 
 export tableau_from_stabilizers
 
+
+function generate_likely_errors(n::Int, r::Int, channel::NTuple{4,Float64})
+    pI, pX, pZ, pY = channel
+    
+    # Create all possible single-qubit errors with their probabilities
+    # I=(0,0), X=(1,0), Z=(0,1), Y=(1,1)
+    single_errors = [
+        (prob=pI, x=0, z=0),
+        (prob=pX, x=1, z=0),
+        (prob=pZ, x=0, z=1),
+        (prob=pY, x=1, z=1)
+    ]
+    sort!(single_errors, by=e->e.prob, rev=true)
+    
+    # Generate all n-qubit error patterns and compute probabilities
+    # We'll enumerate smartly rather than all 4^n possibilities
+    
+    error_patterns = Vector{Tuple{Float64, Vector{Bool}}}()
+    
+    # Strategy: enumerate by Hamming weight (number of non-identity errors)
+    for weight in 0:n
+        if length(error_patterns) >= 10*r  # Stop when we have enough candidates
+            break
+        end
+        
+        # Generate all patterns with this weight
+        for positions in combinations(1:n, weight)
+            # For these positions, try different error types
+            # We'll be greedy: use highest probability errors
+            pattern = zeros(Bool, 2*n)
+            prob = 1.0
+            
+            for pos in positions
+                # Use the most likely non-identity error
+                best_error = single_errors[2]  # Start with second (first is I)
+                pattern[pos] = best_error.x
+                pattern[n + pos] = best_error.z
+                prob *= best_error.prob
+            end
+            
+            # Remaining positions get identity (probability pI each)
+            prob *= pI^(n - weight)
+            
+            push!(error_patterns, (prob, pattern))
+        end
+    end
+    
+    # Sort by probability and take top r
+    sort!(error_patterns, by=e->e[1], rev=true)
+    
+    # Convert to matrix, ensuring linear independence
+    G = falses(0, 2*n)
+    candidates = error_patterns
+    
+    for (prob, pattern) in candidates
+        if size(G, 1) >= r
+            break
+        end
+        
+        # Check if adding this pattern maintains linear independence
+        candidate_G = vcat(G, reshape(pattern, 1, 2*n))
+        if rank_f2(candidate_G) > size(G, 1)
+            G = candidate_G
+            println("  Added error with prob=$prob: $(error_pattern_to_string(pattern, n))")
+        end
+    end
+    
+    if size(G, 1) < r
+        error("Could not find $r linearly independent likely errors")
+    end
+    
+    return G
+end
+
+function error_pattern_to_string(pattern::Vector{Bool}, n::Int)
+    paulis = ['I', 'X', 'Z', 'Y']
+    result = Char[]
+    for i in 1:n
+        x = pattern[i]
+        z = pattern[n + i]
+        idx = 1 + x + 2*z
+        push!(result, paulis[idx])
+    end
+    return String(result)
+end
+
+function combinations(items, k)
+    n = length(items)
+    if k > n || k < 0
+        return []
+    end
+    if k == 0
+        return [[]]
+    end
+    result = []
+    function backtrack(start, current)
+        if length(current) == k
+            push!(result, copy(current))
+            return
+        end
+        for i in start:n
+            push!(current, items[i])
+            backtrack(i + 1, current)
+            pop!(current)
+        end
+    end
+    backtrack(1, [])
+    return result
+end
+
+
+
+
+function tableau_from_channel(n, r, pchannel)
+    S = generate_likely_errors(n, r, pchannel)
+
+    k = (n - r) # since we have lx and lz 
+    # -----------------------------
+    # Step 1: Standard generators Σ
+    # Σ = (Z1, X1, ..., Zn, Xn) in binary (u|v).
+    # Z_i -> (u=0, v=e_i); X_i -> (u=e_i, v=0)
+    # Put them in the Z, X, Z, X order per notes.
+    # -----------------------------
+    # for now i am assuming px > pz > py for proof of concept 
+    #=
+    Sigma = falses(2n, 2n)
+    for i in 1:r
+        # Z_i row
+        Sigma[i, n + i] = true
+    end
+    
+    for i in 0:k
+        # Z_i row
+        Sigma[i+r+1, 1:2n] .= true
+        Sigma[i+r+1, 2n-i] = false
+    end
+    =# 
+    Sigma = trues(2n, 2n) 
+    row = 1
+    for i in 1:n
+        # Z_i row
+        Sigma[row, n + i] = false
+        row += 1
+        # X_i row
+        Sigma[row, i] = false
+        row += 1
+    end
+    # -----------------------------
+    # Step 2: Select exactly 2n independent rows, preferring S first
+    # -----------------------------
+    M = select2n_independent(S, Sigma)
+
+    # -----------------------------
+    # Step 3: SGS on M (list of rows) with full "clean remaining" updates
+    # -----------------------------
+    C, Q = sgs_pairs(Sigma)
+
+    # With exactly 2n independent input rows, C must be empty and |Q| = n
+    @assert isempty(C) "SGS produced commuting leftovers; expected none with 2n-independent input"
+    @assert length(Q) == n "SGS should produce exactly n pairs"
+
+    # -----------------------------
+    # Step 4: Build H,G,Lx,Lz from pairs; first r pairs correspond (in span) to S
+    # -----------------------------
+    H  = falses(r, 2n)
+    G  = falses(r, 2n)
+    Lx = falses(n - r, 2n)
+    Lz = falses(n - r, 2n)
+
+    # First k pairs -> stabilizers (H) and destabilizers (G)
+    for i in 1:k
+        a, b = Q[i]
+        Lx[i, :] .= a
+        Lz[i, :] .= b
+    end
+
+    # Remaining n - r pairs -> logicals (Lx, Lz)
+    for (j, idx) in enumerate(k+1:n)
+        a, b = Q[idx]
+        H[j, :] .= a
+        G[j, :] .= b
+    end
+
+    return G, Lx, Lz, H, M
+end
+
+
+
 """
     tableau_from_stabilizers(S::AbstractMatrix{Bool})
 
@@ -193,4 +381,3 @@ function rank_f2(A::AbstractMatrix{Bool})
 end
 
 end # module
-

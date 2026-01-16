@@ -493,146 +493,20 @@ function test_each_binary_matrix()
     println("  Total: $count (expected 16)")
 end
 
+function make_Smith_bool(n) 
+    k = 1 
+    s = n-k 
+    S = falses(s,2n)
+    
 
-"""
-    All_Codes_DFS(ChannelType, n, k; pz=nothing, r_specific=nothing)
 
-Adapted version to work with the standard block matrix enumeration.
 
-Parameters:
-- ChannelType: The type of quantum channel
-- n: Code parameter n
-- k: Code parameter k (s = n-k is the number of rows)
-- pz: Optional depolarization parameter (computed if not provided)
-- r_specific: Optional specific value of r to test (tests all r if nothing)
-
-Returns:
-- hb_best: Best value found
-- S_best: Best stabilizer matrix found
-- r_best: The r value that gave the best result
-"""
-function All_Codes_DFS(ChannelType, n, k; pz=nothing, r_specific=nothing, points=15, customP=nothing, δ = .3, newBest = nothing)
+function Smith_Code(ChannelType, n, k; pz=nothing, points=15, customP=nothing, δ = .3, newBest = nothing, trials = 1e7, rng = MersenneTwister(2025))
     s = n - k  # Number of rows in the (n-k) × (2n) matrix
     
     # Initialize best trackers for each grid point
 
     S_best = [falses(s, 2n) for _ in 1:points]  # Best matrix at each grid point
-    r_best = fill(-1, points)  # Best r value at each grid point
-    
-    # Compute pz if not provided
-    if pz === nothing 
-        pz = findZeroRate(f, 0, 0.5; maxiter=1000, ChannelType=ChannelType, customP=customP)
-    end 
-    pz_range = range(pz - pz*δ/2, pz + pz*δ/4, length=points)   
-    #pz_range = range(.23,.27, length=points)
- 
-    if newBest === nothing 
-        hb_best = QECInduced.sweep_hashing_grid(pz_range, ChannelType; customP = customP)
-    else 
-        hb_best = newBest
-    end 
-    println(hb_best)
-    println("=" ^ 70)
-    println("Generating binary matrices ($s × $(2*n)) in standard block form")
-    println("Parameters: n=$n, k=$k, s=$s, grid_points=$points")
-    if r_specific !== nothing
-        println("Testing only r=$r_specific")
-    else
-        println("Testing all r values from 0 to $s")
-    end
-    println("pz range: [$(pz_range[1]), $(pz_range[end])]")
-    println("=" ^ 70)
-    
-    # Calculate total possible without constraints
-    total_possible_no_constraints = count_standard_block_matrices(n, k; r=r_specific)
-    println("\nTotal matrices without orthogonality constraints: $total_possible_no_constraints")
-    
-    count = 0
-    count_by_r = Dict{Int,Int}()
-    last_print_count = 0
-    print_interval = max(1, div(total_possible_no_constraints, 20))  # Print ~20 times
-    
-    println("\nStarting enumeration with orthogonality constraints...\n")
-    
-    # Use the optimized iterator with orthogonality checking
-    for info in iterate_standard_block_matrices_optimized(n, k; r=r_specific)
-        count += 1
-        r_val = info.r
-        count_by_r[r_val] = get(count_by_r, r_val, 0) + 1
-        
-        # Convert to Bool matrix
-        S = Matrix{Bool}(info.M)
-        
-        # Check the induced channel at all grid points
-        hb_grid = QECInduced.check_induced_channel(S, pz; ChannelType=ChannelType, sweep=true, ps=pz_range, customP=customP)
-        # Find which grid points improved
-        improved_indices = findall(hb_grid .> (hb_best .+ eps()))
-
-        
-        # Update best for each improved point
-        if !isempty(improved_indices)
-            for idx in improved_indices
-                hb_best[idx] = hb_grid[idx]
-                S_best[idx] = copy(S)
-                r_best[idx] = r_val
-            end
-            
-            println("\n" * "=" ^ 70)
-            println("NEW BEST FOUND! (Matrix #$count, r=$r_val)")
-            println("Improved at $(length(improved_indices)) grid point(s): $improved_indices")
-            println("\nGrid point details:")
-            for idx in improved_indices
-                println("  Point $idx: pz=$(round(pz_range[idx], digits=4)), hb=$(round(hb_best[idx], digits=6))")
-            end
-            println("\nS_best (showing first improved point) =")
-            println(Symplectic.build_from_bits(S_best[improved_indices[1]]))
-            println("=" ^ 70 * "\n")
-        end
-    end
-    
-    println("\n" * "=" ^ 70)
-    println("SEARCH COMPLETE")
-    println("=" ^ 70)
-    println("Valid matrices found (satisfying orthogonality): $count")
-    println("Total possible (without constraints): $total_possible_no_constraints")
-    println("Efficiency gain: $(round((1 - count/total_possible_no_constraints)*100, digits=1))% pruned")
-    
-    println("\nBreakdown by r:")
-    for r_val in sort(collect(keys(count_by_r)))
-        println("  r=$r_val: $(count_by_r[r_val]) matrices checked")
-    end
-    println("*"^70)
-    println(S_best)
-    return hb_best, S_best, r_best
-end
-
-
-
-
-"""
-    All_Codes_Random(ChannelType, n, k; pz=nothing, r_specific=nothing)
-
-Randomly generate stabilizer matrices
-
-Parameters:
-- ChannelType: The type of quantum channel
-- n: Code parameter n
-- k: Code parameter k (s = n-k is the number of rows)
-- pz: Optional depolarization parameter (computed if not provided)
-- r_specific: Optional specific value of r to test (tests all r if nothing)
-
-Returns:
-- hb_best: Best value found
-- S_best: Best stabilizer matrix found
-- r_best: The r value that gave the best result
-"""
-function All_Codes_Random(ChannelType, n, k; pz=nothing, r_specific=nothing, points=15, customP=nothing, δ = .3, newBest = nothing, trials = 1e7, rng = MersenneTwister(2025))
-    s = n - k  # Number of rows in the (n-k) × (2n) matrix
-    
-    # Initialize best trackers for each grid point
-
-    S_best = [falses(s, 2n) for _ in 1:points]  # Best matrix at each grid point
-    r_best = fill(-1, points)  # Best r value at each grid point
     
     # Compute pz if not provided
     if pz === nothing 
@@ -650,172 +524,50 @@ function All_Codes_Random(ChannelType, n, k; pz=nothing, r_specific=nothing, poi
     println("=" ^ 70)
     println("Generating binary matrices ($s × $(2*n)) in standard block form")
     println("Parameters: n=$n, k=$k, s=$s, grid_points=$points")
-    if r_specific !== nothing
-        println("Testing only r=$r_specific")
-    else
-        println("Testing all r values from 0 to $s")
-    end
     println("pz range: [$(pz_range[1]), $(pz_range[end])]")
     println("=" ^ 70)
     
-    # Calculate total possible without constraints
-    total_possible_no_constraints = count_standard_block_matrices(n, k; r=r_specific)
-    if total_possible_no_constraints == 0 
-        total_possible_no_constraints = trials 
-    end 
-    println("\nTotal matrices without orthogonality constraints: $total_possible_no_constraints")
-    
-    count = 0
-    count_by_r = Dict{Int,Int}()
-    last_print_count = 0
-    print_interval = max(1, div(total_possible_no_constraints, 20))  # Print ~20 times
-    
-    println("\nStarting enumeration with orthogonality constraints...\n")
-    
-    # Use the optimized iterator with orthogonality checking
-    for info in random_standard_block_matrices_optimized(n, k; r=r_specific, trials = trials, rng = rng)
-        count += 1
-        r_val = info.r
-        count_by_r[r_val] = get(count_by_r, r_val, 0) + 1
+
+    smithBool = make_Smith_bool(n)
+
+    # Convert to Bool matrix
+    S = Matrix{Bool}(info.M)
         
-        # Convert to Bool matrix
-        S = Matrix{Bool}(info.M)
+    # Check the induced channel at all grid points
+    hb_grid = QECInduced.check_induced_channel(S, pz; ChannelType=ChannelType, sweep=true, ps=pz_range, customP=customP)
         
-        # Check the induced channel at all grid points
-        hb_grid = QECInduced.check_induced_channel(S, pz; ChannelType=ChannelType, sweep=true, ps=pz_range, customP=customP)
+    # Find which grid points improved
+    improved_indices = findall(hb_grid .> (hb_best .+ eps()))
         
-        # Find which grid points improved
-        improved_indices = findall(hb_grid .> (hb_best .+ eps()))
-        
-        # Update best for each improved point
-        if !isempty(improved_indices)
-            for idx in improved_indices
-                hb_best[idx] = hb_grid[idx]
-                S_best[idx] = copy(S)
-                r_best[idx] = r_val
-            end
-            
-            println("\n" * "=" ^ 70)
-            println("NEW BEST FOUND! (Matrix #$count, r=$r_val)")
-            println("Improved at $(length(improved_indices)) grid point(s): $improved_indices")
-            println("\nGrid point details:")
-            for idx in improved_indices
-                println("  Point $idx: pz=$(round(pz_range[idx], digits=4)), hb=$(round(hb_best[idx], digits=6))")
-            end
-            println("\nS_best (showing first improved point) =")
-            println(Symplectic.build_from_bits(S_best[improved_indices[1]]))
-            println("=" ^ 70 * "\n")
+    # Update best for each improved point
+    if !isempty(improved_indices)
+        for idx in improved_indices
+            hb_best[idx] = hb_grid[idx]
+            S_best[idx] = copy(S)
         end
-        
+            
+        println("\n" * "=" ^ 70)
+        println("NEW BEST FOUND! (Matrix #$count)")
+        println("Improved at $(length(improved_indices)) grid point(s): $improved_indices")
+        println("\nGrid point details:")
+        for idx in improved_indices
+            println("  Point $idx: pz=$(round(pz_range[idx], digits=4)), hb=$(round(hb_best[idx], digits=6))")
+        end
+        println("\nS_best (showing first improved point) =")
+        println(Symplectic.build_from_bits(S_best[improved_indices[1]]))
+        println("=" ^ 70 * "\n")
     end
-    
+        
     println("\n" * "=" ^ 70)
     println("SEARCH COMPLETE")
     println("=" ^ 70)
     println("Valid matrices found (satisfying orthogonality): $count")
     println("Total possible (without constraints): $total_possible_no_constraints")
     println("Efficiency gain: $(round((1 - count/total_possible_no_constraints)*100, digits=1))% pruned")
+
     
-    println("\nBreakdown by r:")
-    for r_val in sort(collect(keys(count_by_r)))
-        println("  r=$r_val: $(count_by_r[r_val]) matrices checked")
-    end
-    
-    return hb_best, S_best, r_best
+    return hb_best, S_best,
 end
-
-
-
-
-"""
-    All_Codes_DFS_parallel(ChannelType, n, k; pz=nothing, use_threads=true)
-
-Parallel version that searches all r values independently using Julia threads.
-Can be more efficient since different r values can be checked in parallel.
-
-To use threading, start Julia with: `julia -t auto` or `julia -t 8` (for 8 threads)
-Check available threads with: `Threads.nthreads()`
-"""
-
-function All_Codes_DFS_parallel(ChannelType, n, k; pz=nothing, use_threads=true, points = 15, customP = nothing, δ = .3, newBest = nothing)
-    s = n - k
-    
-    if pz === nothing 
-        pz = findZeroRate(f, 0, 0.5; maxiter=1000, ChannelType=ChannelType, customP = customP)
-    end
-    pz_range = range(pz - pz*δ/2, pz + pz*δ/4, length=points)   
-    #pz_range = range(.23,.27, length=points)
- 
-    n_threads = Threads.nthreads()
-    println("=" ^ 70)
-    println("PARALLEL SEARCH: Testing each r value independently")
-    println("Parameters: n=$n, k=$k, s=$s")
-    println("Available threads: $n_threads")
-    println("Using threads: $use_threads")
-    println("=" ^ 70)
-    
-    if use_threads && n_threads == 1
-        @warn "Only 1 thread available. Start Julia with `julia -t auto` for multi-threading."
-    end
-    
-    # Pre-allocate results array
-    r_values = collect(0:s)
-    n_r = length(r_values)
-    results = Vector{Any}(undef, n_r)
-    s_best = Vector{Any}(undef, points)
-    
-    if use_threads && n_threads > 1
-        # Parallel execution using threads
-        println("\nStarting parallel search across $n_r r values using $n_threads threads...")
-        
-        Threads.@threads for i in 1:n_r
-            r_val = r_values[i]
-            println("Thread $(Threads.threadid()): Starting r=$r_val")
-            
-            hb, S, r = All_Codes_DFS(ChannelType, n, k; pz=pz, r_specific=r_val, customP = customP, δ = δ, newBest = newBest, points = points)
-            results[i] = (r=r_val, hb=hb, S=S)
-            
-            println("Thread $(Threads.threadid()): Completed r=$r_val, hb=$hb")
-        end
-    else
-        # Sequential execution (fallback)
-        println("\nRunning sequential search (no threading)...")
-        for i in 1:n_r
-            r_val = r_values[i]
-            println("\n--- Starting search for r=$r_val ---")
-            
-            hb, S, r = All_Codes_DFS(ChannelType, n, k; pz=pz, r_specific=r_val, points = points, customP = customP, δ = δ, newBest = newBest)
-            results[i] = (r=r_val, hb=hb, S=S)
-        end
-    end
-    total_best = QECInduced.sweep_hashing_grid(pz_range, ChannelType; customP = customP)
-    for i in 1:n_r 
-        replaceIndices = findall(results[i].hb .> total_best)
-        s_best[replaceIndices] = (results[i].S)[replaceIndices]
-        total_best = max.(total_best, results[i].hb)
-    end
-    # Find overall best
-    #best_idx = argmax([res.hb for res in results])
-    #best_result = results[best_idx]
-    
-    println("\n" * "=" ^ 70)
-    println("PARALLEL SEARCH COMPLETE")
-    println("-" ^ 70)
-    println("Results by r value:")
-    for res in results
-        println("  r=$(res.r): hb=$(res.hb)")
-    end
-    println("-" ^ 70)
-    println("OVERALL BEST:")
-    #println("  r_best = $(best_result.r)")
-    println("  overall_best = $(total_best)")
-    println("=" ^ 70)
-    
-    return total_best, s_best
-end
-
-
-
 
 
 """
@@ -938,28 +690,15 @@ function envelope_finder(n_range, ChannelType; pz = nothing, customP = nothing, 
     base_grid = copy(hashing)
     s_best = Vector{Any}(undef, points)
     #trials_unaltered = trials 
+    k = 1 
     elapsed_time = @elapsed begin
         for n in n_range
-            #trials = floor(trials_unaltered/n) 
-            for k in 1:Int(floor(div(n,2)))
                 elapsed_time_internal = @elapsed begin
-                    base_trials = count_standard_block_matrices(n, k) 
-                    if base_trials == 0 
-                        base_trials = trials 
-                    end 
-                    if randomSearch && (base_trials > trials)
-                        println("Using Random Search")
-                        best_grid, S_grid = All_Codes_Random(ChannelType, n, k; customP = customP, points = points, δ = δ, newBest = best_grid, trials = trials, rng = rng)
-                        improve_indices = findall(best_grid .> base_grid)
-                        s_best[improve_indices] = S_grid[improve_indices]
-                        base_grid = max.(base_grid,best_grid)
-                    else 
-                        println("Using Iterative Search")
-                        best_grid, S_grid = All_Codes_DFS_parallel(ChannelType, n, k; customP = customP, points = points, δ = δ, newBest = best_grid)
-                        improve_indices = findall(best_grid .> base_grid)
-                        s_best[improve_indices] = S_grid[improve_indices]
-                        base_grid = max.(base_grid,best_grid)
-                    end
+                    println("Using Iterative Search")
+                    best_grid, S_grid = Smith_Code(ChannelType, n, k; customP = customP, points = points, δ = δ, newBest = best_grid)
+                    improve_indices = findall(best_grid .> base_grid)
+                    s_best[improve_indices] = S_grid[improve_indices]
+                    base_grid = max.(base_grid,best_grid)
                 end 
                 println("Elapsed time: $elapsed_time_internal seconds") 
                 printCodes(base_grid, points, pz_range, s_best, hashing)
