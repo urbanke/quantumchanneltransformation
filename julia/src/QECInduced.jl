@@ -22,15 +22,15 @@ using .ParallelSweep
 
 
 
-function findZeroRate(f, a, b, customP; tol=1e-16, maxiter=1000)
-    fa, fb = f(a, customP), f(b, customP)
+function findZeroRate(f, a, b, channelParamFunc; tol=1e-16, maxiter=1000)
+    fa, fb = f(a, channelParamFunc), f(b, channelParamFunc)
     if fa * fb > 0
         error("f(a) and f(b) must have opposite signs")
     end
 
     for i in 1:maxiter
         c = (a + b) / 2
-        fc = f(c, customP)
+        fc = f(c, channelParamFunc)
 
         if abs(fc) < tol || (b - a)/2 < tol
             return c  # found root
@@ -46,8 +46,8 @@ function findZeroRate(f, a, b, customP; tol=1e-16, maxiter=1000)
     return (a + b) / 2  # best estimate after maxiter
 end
 
-function f(p, customP)
-    pc = customP(p)
+function f(p, channelParamFunc)
+    pc = channelParamFunc(p)
     return 1 - H(pc)
 end
 
@@ -111,8 +111,8 @@ sweep_independent_grid(H, Lx, Lz, G; p_min=0.0, p_max=1.0, step=0.01, threads=Th
     ParallelSweep.sweep_independent_grid(H, Lx, Lz, G; p_min, p_max, step, threads)
 
 
-sweep_custom_grid_exact(H, Lx, Lz, G, ps, customP; threads::Int=Threads.nthreads()) =
-    ParallelSweep.sweep_custom_grid_exact(H, Lx, Lz, G, ps, customP; threads) 
+sweep_custom_grid_exact(H, Lx, Lz, G, ps, channelParamFunc; threads::Int=Threads.nthreads()) =
+    ParallelSweep.sweep_custom_grid_exact(H, Lx, Lz, G, ps, channelParamFunc; threads) 
 
 
 """
@@ -120,8 +120,8 @@ sweep_custom_grid_exact(H, Lx, Lz, G, ps, customP; threads::Int=Threads.nthreads
 
 Calculates hashing bound for a list of points ps 
 """
-sweep_hashing_grid(ps, customP) =
-    ParallelSweep.sweep_hashing_grid(ps, customP)
+sweep_hashing_grid(ps, channelParamFunc) =
+    ParallelSweep.sweep_hashing_grid(ps, channelParamFunc)
 
 
 
@@ -134,17 +134,17 @@ sweep_hashing_grid(ps, customP) =
 Takes in a list of stabilizers, as well as the ChannelFunc (see env_utils/env_utils/Channels.jl). If there is a moment where the induced channel is both better than 0 AND H(p_channel), it returns true
 Stabilizer must be in boolean form not XYZ form. 
 """
-function check_induced_channel(S, pz, customP; sweep = false, ps = 0:.01:.5, threads = Threads.nthreads())
+function check_induced_channel(S, pz, channelParamFunc; sweep = false, ps = 0:.01:.5, threads = Threads.nthreads())
     # Build tableau/logicals
     H, Lx, Lz, G = QECInduced.tableau_from_stabilizers(S)
     # check that each of H, Lx, Lz, G commute within themselves
     @assert(Symplectic.sanity_check(H,Lx,Lz,G) == true, "Error Constructing Tableau")
     if sweep == true 
         # Use ps directly instead of reconstructing the range
-        grid = QECInduced.sweep_custom_grid_exact(H, Lx, Lz, G, ps, customP, threads = Threads.nthreads())
+        grid = QECInduced.sweep_custom_grid_exact(H, Lx, Lz, G, ps, channelParamFunc, threads = Threads.nthreads())
         return grid[:,2]
     else 
-        channel = customP(pz, tuple = true)
+        channel = channelParamFunc(pz, tuple = true)
         hb = Induced.induced_channel_and_hashing_bound(H, Lx, Lz, G, channel)
         return hb
     end

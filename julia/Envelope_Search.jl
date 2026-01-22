@@ -21,9 +21,9 @@ using Random
 
 
 
-function envelope_finder(n_range, customP; pz = nothing, points = 15, δ = .3, randomSearch = false, useTrials = false, trials = 1e7, rng = MersenneTwister(2025), pz_range_override = nothing, concated = nothing, placement = "inner", lowerrate = 1, upperate = 1, FileName = "hashing_bound_envelope") 
+function envelope_finder(n_range, channelParamFunc; pz = nothing, points = 15, δ = .3, randomSearch = false, useTrials = false, trials = 1e7, rng = MersenneTwister(2025), pz_range_override = nothing, concated = nothing, placement = "inner", lowerrate = 1, upperate = 1, FileName = "hashing_bound_envelope") 
     if pz === nothing 
-        pz = findZeroRate(f, 0, 0.5, customP; maxiter=1000)
+        pz = findZeroRate(f, 0, 0.5, channelParamFunc; maxiter=1000)
     end
     println(pz)
 
@@ -40,7 +40,7 @@ function envelope_finder(n_range, customP; pz = nothing, points = 15, δ = .3, r
     println("]")
 
 
-    hashing = QECInduced.sweep_hashing_grid(pz_range, customP)
+    hashing = QECInduced.sweep_hashing_grid(pz_range, channelParamFunc)
     best_grid = copy(hashing)
     println(hashing)
     println(length(hashing))
@@ -49,13 +49,13 @@ function envelope_finder(n_range, customP; pz = nothing, points = 15, δ = .3, r
     s_best = Vector{Any}(undef, points)
     elapsed_time = @elapsed begin
         for n in n_range
-            # do this first - check if smiths codes are better 
-            best_grid, S_grid = repitition_code_check(customP, n; pz = pz, points= points, δ = δ, newBest = best_grid, pz_range_override = pz_range, concated = nothing, placement = placement) 
+            # we know the smiths codes are good, so we should guarantee that we check them.  
+            best_grid, S_grid = repitition_code_check(channelParamFunc, n; pz = pz, points= points, δ = δ, newBest = best_grid, pz_range_override = pz_range, concated = nothing, placement = placement) 
             improve_indices = findall(best_grid .> base_grid)
             s_best[improve_indices] = S_grid[improve_indices]
             base_grid = max.(base_grid,best_grid)
-            if !isnothing(concated) #should also check just concatenatng it with the smith code
-                best_grid, S_grid = repitition_code_check(customP, n; pz = pz, points= points, δ = δ, newBest = best_grid, pz_range_override = pz_range, concated = concated, placement = placement)
+            if !isnothing(concated) #should also check just concatenatng it with the smith code (same idea as above)
+                best_grid, S_grid = repitition_code_check(channelParamFunc, n; pz = pz, points= points, δ = δ, newBest = best_grid, pz_range_override = pz_range, concated = concated, placement = placement)
                 improve_indices = findall(best_grid .> base_grid)
                 s_best[improve_indices] = S_grid[improve_indices]
                 base_grid = max.(base_grid,best_grid)
@@ -71,13 +71,13 @@ function envelope_finder(n_range, customP; pz = nothing, points = 15, δ = .3, r
                         end 
                         if randomSearch && (base_trials ≥ trials)
                             println("Using Random Search")
-                            best_grid, S_grid = All_Codes_Random_SGS(customP, n, k, r; pz = pz, points = points, δ = δ, newBest = best_grid, trials = trials, pz_range_override = pz_range, concated = concated, placement = placement, rng = rng)
+                            best_grid, S_grid = All_Codes_Random_SGS(channelParamFunc, n, k, r; pz = pz, points = points, δ = δ, newBest = best_grid, trials = trials, pz_range_override = pz_range, concated = concated, placement = placement, rng = rng)
                             improve_indices = findall(best_grid .> base_grid)
                             s_best[improve_indices] = S_grid[improve_indices]
                             base_grid = max.(base_grid,best_grid)
                         else 
                             println("Using Iterative Search")
-                            best_grid, S_grid = All_Codes_DFS(customP, n, k; threads = 0, r_specific = r, pz = pz, points = points, δ = δ, newBest = best_grid, trials = trials, useTrials = useTrials, pz_range_override = pz_range, concated = concated, placement = placement)
+                            best_grid, S_grid = All_Codes_DFS(channelParamFunc, n, k; threads = 0, r_specific = r, pz = pz, points = points, δ = δ, newBest = best_grid, trials = trials, pz_range_override = pz_range, concated = concated, placement = placement)
                             improve_indices = findall(best_grid .> base_grid)
                             s_best[improve_indices] = S_grid[improve_indices]
                             base_grid = max.(base_grid,best_grid)
@@ -92,7 +92,7 @@ function envelope_finder(n_range, customP; pz = nothing, points = 15, δ = .3, r
     println("Total time: $elapsed_time seconds")
     p_plot = zeros(points)
     for i in 1:points
-        p_plot[i] = customP(pz_range[i]; plot = true)
+        p_plot[i] = channelParamFunc(pz_range[i]; plot = true)
     end 
     println("p: ", pz_range)
     plt = plot(
@@ -117,23 +117,20 @@ end
 
 
 function main()
-    customP = Channels.ninexz
-    n_range = 1:1:14
-    points = 15
-    concated = nothing# Bool[0 0 0 0 0 0 1 1 1 1 1 1] #nothing # Bool[0 0 0 0 0 1 0 0 0 1; 0 0 0 0 0 0 1 0 0 1; 0 0 0 0 0 0 0 1 0 1; 0 0 0 0 0 0 0 0 1 1]
-    placement = "outer"
-    #pz_range_override = range(.188, 0.1906, length = points)
-    #pz_range_override = range(.2447, 0.2447, length = points)
-    pz_range_override = range(0.225, .23, length = points)
-    #pz_range_override = range(0.1904775,0.1904775,length = 1)
-    #pz_range_override = range(0.230, .233, length = points)
-    #pz_range_override = range(0.24414285714285713, 0.24692857142857144, length = points)
-    #pz_range_override = range(.1835, 0.188, length = points)
-    #pz_range_override = range(.1893, 0.1904775, length = points)
-    #pz_range_override = range(0.18889285714285714, 0.19022857142857144, length = points)
-    lowerrate = 1
-    upperate = 1
-    hashing, base_grid, s_best = envelope_finder(n_range, customP; pz = nothing, randomSearch = true, useTrials = true, trials = 2^15 + 1, points = points, pz_range_override = pz_range_override, concated = concated, placement = placement, lowerrate = lowerrate, upperate = upperate)
+    n_range = 2:1:14 # The range of n searched over 
+    trials = 2^15 + 1 # This is the number of trials. If there are more possiblem matrices than trials, do random search; else, do DFS. 
+    # Warning: This trials is searched for each (n,k,r) triple. So you may want a fewer trials than you think, because it will do it multiple times for each (n,k) tuple 
+    channelParamFunc = Channels.Independent_Skewed_X_Nine # The type of channel searched over - see env_utils/Channels.jl for the options 
+    p_range = range(0.24, .25, length = 15) # The range of $p$ searched over 
+    points = length(p_range) # the number of points searched over 
+    concated = nothing # what the code is concatenated with. Options are nothing or a code constructed with Bool[] (see below for examples)
+    # Bool[0 0 0 0 0 0 1 1 1 1 1 1] #nothing # Bool[0 0 0 0 0 1 0 0 0 1; 0 0 0 0 0 0 1 0 0 1; 0 0 0 0 0 0 0 1 0 1; 0 0 0 0 0 0 0 0 1 1]
+    placement = "outer" # Where the concatenated code is. Options are inner or outer (does nothing if concated = nothing)
+    lowerrate = 0 # This is the lower range of k that will be searched, i.e. floor(n*lowerrate) (will ensure that k > 0) 
+    upperate = 1 # This is the upper range of k that will be searched, i.e. ceil(n*upperate) (will ensure that k < n) 
+    hashing, base_grid, s_best = envelope_finder(n_range, channelParamFunc; pz = nothing, randomSearch = true, trials = 2^15 + 1, 
+                                                points = points, pz_range_override = p_range, concated = concated,
+                                                 placement = placement, lowerrate = lowerrate, upperate = upperate)
 end
 
 # Run the main function

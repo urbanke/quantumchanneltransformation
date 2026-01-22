@@ -2,9 +2,9 @@ module IterativeMatrix
 export iterate_standard_block_matrices_optimized, All_Codes_DFS_parallel, All_Codes_DFS, count_standard_block_matrices
 
 
-include("src/Symplectic.jl")
-include("src/SGS.jl")
-include("env_utils/EnvelopeUtil.jl")
+include("../src/Symplectic.jl")
+include("../src/SGS.jl")
+include("../env_utils/EnvelopeUtil.jl")
 
 using .Symplectic, .SGS, .EnvelopeUtil
 using QECInduced
@@ -325,12 +325,12 @@ end
 
 
 """
-    All_Codes_DFS(customP, n, k; pz=nothing, r_specific=nothing)
+    All_Codes_DFS(channelParamFunc, n, k; pz=nothing, r_specific=nothing)
 
 Adapted version to work with the standard block matrix enumeration.
 
 Parameters:
-- customP: The type of quantum channel
+- channelParamFunc: The type of quantum channel
 - n: Code parameter n
 - k: Code parameter k (s = n-k is the number of rows)
 - pz: Optional depolarization parameter (computed if not provided)
@@ -341,7 +341,7 @@ Returns:
 - S_best: Best stabilizer matrix found
 - r_best: The r value that gave the best result
 """
-function All_Codes_DFS(customP, n, k; pz=nothing, r_specific=nothing, points=15, δ = .3, newBest = nothing, threads = Threads.nthreads(), trials = 1e6, useTrials = false, pz_range_override = nothing, concated = nothing, placement = "inner") 
+function All_Codes_DFS(channelParamFunc, n, k; pz=nothing, r_specific=nothing, points=15, δ = .3, newBest = nothing, threads = Threads.nthreads(), trials = 1e6, useTrials = false, pz_range_override = nothing, concated = nothing, placement = "inner") 
     s = n - k  # Number of rows in the (n-k) × (2n) matrix
     
     # Initialize best trackers for each grid point
@@ -351,7 +351,7 @@ function All_Codes_DFS(customP, n, k; pz=nothing, r_specific=nothing, points=15,
     
     # Compute pz if not provided
     if pz === nothing 
-        pz = findZeroRate(f, 0, 0.5, customP; maxiter=1000)
+        pz = findZeroRate(f, 0, 0.5, channelParamFunc; maxiter=1000)
     end 
 
     if pz_range_override === nothing 
@@ -365,7 +365,7 @@ function All_Codes_DFS(customP, n, k; pz=nothing, r_specific=nothing, points=15,
     #pz_range = range(0.2334285714285714 - 0.0025714285714285856, 0.2334285714285714 + 0.0025714285714285856, length = points)
 
     if newBest === nothing 
-        hb_best = QECInduced.sweep_hashing_grid(pz_range, customP)
+        hb_best = QECInduced.sweep_hashing_grid(pz_range, channelParamFunc)
     else 
         hb_best = newBest
     end 
@@ -410,7 +410,7 @@ function All_Codes_DFS(customP, n, k; pz=nothing, r_specific=nothing, points=15,
             end
         end
         # Check the induced channel at all grid points
-        hb_grid = QECInduced.check_induced_channel(S, pz, customP; sweep=true, ps=pz_range, threads = threads)
+        hb_grid = QECInduced.check_induced_channel(S, pz, channelParamFunc; sweep=true, ps=pz_range, threads = threads)
         # Find which grid points improved
         improved_indices = findall(hb_grid .> (hb_best .+ eps()))
 
@@ -458,7 +458,7 @@ end
 
 
 """
-    All_Codes_DFS_parallel(customP, n, k; pz=nothing, use_threads=true)
+    All_Codes_DFS_parallel(channelParamFunc, n, k; pz=nothing, use_threads=true)
 
 Parallel version that searches all r values independently using Julia threads.
 Can be more efficient since different r values can be checked in parallel.
@@ -467,11 +467,11 @@ To use threading, start Julia with: `julia -t auto` or `julia -t 8` (for 8 threa
 Check available threads with: `Threads.nthreads()`
 """
 
-function All_Codes_DFS_parallel(customP, n, k; pz=nothing, use_threads=true, points = 15, δ = .3, newBest = nothing, trials = 1e6, useTrials = false, pz_range_override = nothing, concated = nothing, placement = "inner")  
+function All_Codes_DFS_parallel(channelParamFunc, n, k; pz=nothing, use_threads=true, points = 15, δ = .3, newBest = nothing, trials = 1e6, useTrials = false, pz_range_override = nothing, concated = nothing, placement = "inner")  
     s = n - k
 
     if pz === nothing 
-        pz = findZeroRate(f, 0, 0.5, customP; maxiter=1000)
+        pz = findZeroRate(f, 0, 0.5, channelParamFunc; maxiter=1000)
     end
 
 
@@ -508,7 +508,7 @@ function All_Codes_DFS_parallel(customP, n, k; pz=nothing, use_threads=true, poi
             r_val = r_values[i]
             println("Thread $(Threads.threadid()): Starting r=$r_val")
             
-            hb, S = All_Codes_DFS(customP, n, k; pz=pz, r_specific=r_val, δ = δ, newBest = newBest, points = points, threads = 0, trials = trials, useTrials = useTrials, pz_range_override = pz_range, concated = concated, placement = placement)
+            hb, S = All_Codes_DFS(channelParamFunc, n, k; pz=pz, r_specific=r_val, δ = δ, newBest = newBest, points = points, threads = 0, trials = trials, useTrials = useTrials, pz_range_override = pz_range, concated = concated, placement = placement)
             results[i] = (r=r_val, hb=hb, S=S)
             
             println("Thread $(Threads.threadid()): Completed r=$r_val, hb=$hb")
@@ -520,11 +520,11 @@ function All_Codes_DFS_parallel(customP, n, k; pz=nothing, use_threads=true, poi
             r_val = r_values[i]
             println("\n--- Starting search for r=$r_val ---")
             
-            hb, S = All_Codes_DFS(customP, n, k; pz=pz, r_specific=r_val, points = points,  δ = δ, newBest = newBest, trials = trials, useTrials = useTrials, pz_range_override = pz_range, concated = concated, placement = placement)
+            hb, S = All_Codes_DFS(channelParamFunc, n, k; pz=pz, r_specific=r_val, points = points,  δ = δ, newBest = newBest, trials = trials, useTrials = useTrials, pz_range_override = pz_range, concated = concated, placement = placement)
             results[i] = (r=r_val, hb=hb, S=S)
         end
     end
-    total_best = QECInduced.sweep_hashing_grid(pz_range, customP)
+    total_best = QECInduced.sweep_hashing_grid(pz_range, channelParamFunc)
     for i in 1:n_r 
         replaceIndices = findall(results[i].hb .> total_best)
         if !isempty(replaceIndices)

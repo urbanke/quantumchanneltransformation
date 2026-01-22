@@ -1,8 +1,8 @@
 module EnvelopeUtil
 export repitition_code_check, check_threading_setup, concat_stabilizers_bool, printCodes, printCodesSlurm
 
-include("src/Symplectic.jl")
-include("src/SGS.jl")
+include("../src/Symplectic.jl")
+include("../src/SGS.jl")
 
 
 using .Symplectic, .SGS
@@ -24,7 +24,7 @@ function smith_rep_maker(n)
 end 
 
 
-function repitition_code_check(customP, n; pz=nothing, points=15, δ = .3, newBest = nothing, threads = Threads.nthreads(), pz_range_override = nothing, concated = nothing, placement = "inner") 
+function repitition_code_check(channelParamFunc, n; pz=nothing, points=15, δ = .3, newBest = nothing, threads = Threads.nthreads(), pz_range_override = nothing, concated = nothing, placement = "inner") 
     s = n - 1  # Number of rows in the (n-k) × (2n) matrix
     
     # Initialize best trackers for each grid point
@@ -34,7 +34,7 @@ function repitition_code_check(customP, n; pz=nothing, points=15, δ = .3, newBe
     
     # Compute pz if not provided
     if pz === nothing 
-        pz = findZeroRate(f, 0, 0.5, customP; maxiter=1000)
+        pz = findZeroRate(f, 0, 0.5, channelParamFunc; maxiter=1000)
     end 
 
     if pz_range_override === nothing 
@@ -48,7 +48,7 @@ function repitition_code_check(customP, n; pz=nothing, points=15, δ = .3, newBe
     #pz_range = range(0.2334285714285714 - 0.0025714285714285856, 0.2334285714285714 + 0.0025714285714285856, length = points)
 
     if newBest === nothing 
-        hb_best = QECInduced.sweep_hashing_grid(pz_range, customP)
+        hb_best = QECInduced.sweep_hashing_grid(pz_range, channelParamFunc)
     else 
         hb_best = newBest
     end 
@@ -67,7 +67,7 @@ function repitition_code_check(customP, n; pz=nothing, points=15, δ = .3, newBe
         end
     end
     # Check the induced channel at all grid points
-    hb_grid = QECInduced.check_induced_channel(S, pz, customP; sweep=true, ps=pz_range, threads = threads)
+    hb_grid = QECInduced.check_induced_channel(S, pz, channelParamFunc; sweep=true, ps=pz_range, threads = threads)
     # Find which grid points improved
     improved_indices = findall(hb_grid .> (hb_best .+ eps()))
 

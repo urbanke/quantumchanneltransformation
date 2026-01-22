@@ -2,8 +2,8 @@ module Isotropic
 export random_isotropic_basis_with_structure, All_Codes_Random_SGS
 
 
-include("src/Symplectic.jl")
-include("src/SGS.jl")
+include("../src/Symplectic.jl")
+include("../src/SGS.jl")
 
 
 using .Symplectic, .SGS
@@ -366,7 +366,7 @@ function random_isotropic_basis_with_structure(n::Int, s::Int, r::Int; rng = Ran
     return S
 end
 
-function All_Codes_Random_SGS(ChannelType, n, k, r; pz=nothing, points=15, customP=nothing, δ = .3, newBest = nothing, trials = 1e7, rng = MersenneTwister(2025), pz_range_override = nothing, concated = nothing, placement = "inner") 
+function All_Codes_Random_SGS(ChannelType, n, k, r; pz=nothing, points=15, channelParamFunc=nothing, δ = .3, newBest = nothing, trials = 1e7, rng = MersenneTwister(2025), pz_range_override = nothing, concated = nothing, placement = "inner") 
     s = n - k  # Number of rows in the (n-k) × (2n) matrix
     
     # Initialize best trackers for each grid point
@@ -375,7 +375,7 @@ function All_Codes_Random_SGS(ChannelType, n, k, r; pz=nothing, points=15, custo
     
     # Compute pz if not provided
     if pz === nothing 
-        pz = findZeroRate(f, 0, 0.5; maxiter=1000, ChannelType=ChannelType, customP=customP)
+        pz = findZeroRate(f, 0, 0.5; maxiter=1000, ChannelType=ChannelType, channelParamFunc=channelParamFunc)
     end 
 
 
@@ -387,7 +387,7 @@ function All_Codes_Random_SGS(ChannelType, n, k, r; pz=nothing, points=15, custo
     end  
 
     if newBest === nothing 
-        hb_best = QECInduced.sweep_hashing_grid(pz_range, ChannelType; customP = customP)
+        hb_best = QECInduced.sweep_hashing_grid(pz_range, ChannelType; channelParamFunc = channelParamFunc)
     else 
         hb_best = newBest
     end 
@@ -422,7 +422,7 @@ function All_Codes_Random_SGS(ChannelType, n, k, r; pz=nothing, points=15, custo
                 end
             end
             # Check the induced channel at all grid points
-            hb_grid = QECInduced.check_induced_channel(S, pz; ChannelType=ChannelType, sweep=true, ps=pz_range, customP=customP)
+            hb_grid = QECInduced.check_induced_channel(S, pz; ChannelType=ChannelType, sweep=true, ps=pz_range, channelParamFunc=channelParamFunc)
             
             # Find which grid points improved
             improved_indices = findall(hb_grid .> (hb_best .+ eps()))

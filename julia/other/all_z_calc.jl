@@ -12,13 +12,13 @@ using Random
 using Printf 
 
 
-function all_z_code_check(customP, n, pz) 
+function all_z_code_check(channelParamFunc, n, pz) 
     s = n - 1  # Number of rows in the (n-k) × (2n) matrix    
     S = falses(1,2n)
     S[1,(n+1):end] .= true 
     S = Matrix{Bool}(S)
-    hb = QECInduced.sweep_hashing_grid(pz_range, customP)
-    hb_ind = QECInduced.check_induced_channel(S, pz, customP; sweep=false, threads = threads)
+    hb = QECInduced.sweep_hashing_grid(pz_range, channelParamFunc)
+    hb_ind = QECInduced.check_induced_channel(S, pz, channelParamFunc; sweep=false, threads = threads)
     return hb_ind .- hb
 end 
 

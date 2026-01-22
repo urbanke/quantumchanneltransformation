@@ -162,17 +162,17 @@ pz_range = range(0.23, .25, length = points)
 
 pz = 0 
 
-customP = Channels.ninexz # change this 
+channelParamFunc = Channels.Independent_Skewed_X_Nine # change this 
 
 
-hashing = QECInduced.sweep_hashing_grid(pz_range, customP)
-hb_grid = QECInduced.check_induced_channel(S, pz, customP; sweep=true, ps=pz_range, threads = 0)
+hashing = QECInduced.sweep_hashing_grid(pz_range, channelParamFunc)
+hb_grid = QECInduced.check_induced_channel(S, pz, channelParamFunc; sweep=true, ps=pz_range, threads = 0)
 #@show p_channel
 print("[")
 for i in pz_range[1:end-1]
-    print(ninexz(i;plot=true), ", ")
+    print(Channels.Independent_Skewed_X_Nine(i;plot=true), ", ")
 end 
-println(ninexz(pz_range[end];plot=true), "]")
+println(Channels.Independent_Skewed_X_Nine(pz_range[end];plot=true), "]")
 println(hashing)
 println(hb_grid) 
 

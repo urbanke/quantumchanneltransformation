@@ -1,5 +1,5 @@
 module Channels
-export ninexz, depolar, twoPauli, indy 
+export Independent_Skewed_X_Nine, Depolarizing, twoPauli, Independent 
 
 
 """  
@@ -17,7 +17,7 @@ function ChannelName(x; tuple = false, plot = false)
 """
 
 
-function ninexz(x; tuple = false, plot = false) # this is an example of customP, which gives the same one smith did 
+function Independent_Skewed_X_Nine(x; tuple = false, plot = false) # this is an example of channelParamFunc, which gives the same one smith did 
     z = x/9
     pI = (1-z)*(1-x)  
     pX = x*(1-z) 
@@ -33,7 +33,7 @@ function ninexz(x; tuple = false, plot = false) # this is an example of customP,
 end 
 
 
-function depolar(p; tuple = false, plot = false) # this is an example of customP, which gives the same one smith did 
+function Depolarizing(p; tuple = false, plot = false) # this is an example of channelParamFunc, which gives the same one smith did 
     pI = (1-p)
     pX = p/3
     pZ = p/3
@@ -47,7 +47,7 @@ function depolar(p; tuple = false, plot = false) # this is an example of customP
     return [pI, pX, pZ, pY]
 end 
 
-function twoPauli(p; tuple = false, plot = false) # this is an example of customP, which gives the same one smith did 
+function twoPauli(p; tuple = false, plot = false) # this is an example of channelParamFunc, which gives the same one smith did 
     pI = (1-p)
     pX = p/2
     pZ = p/2
@@ -61,7 +61,7 @@ function twoPauli(p; tuple = false, plot = false) # this is an example of custom
     return [pI, pX, pZ, pY]
 end 
 
-function indy(x; tuple = false, plot = false)
+function Independent(x; tuple = false, plot = false)
     z = x 
     pI = (1-z)*(1-x) 
     pX = x*(1-z) 

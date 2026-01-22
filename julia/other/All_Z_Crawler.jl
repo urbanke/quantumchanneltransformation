@@ -24,50 +24,50 @@ function hashing_calc(p, pfunc)
     return 1 - h 
 end 
 
-function all_z_code_check(n, pz, customP) 
+function all_z_code_check(n, pz, channelParamFunc) 
     S = falses(1,2n)
     S[1,(n+1):end] .= true 
     S = Matrix{Bool}(S)
-    hb_ind = QECInduced.check_induced_channel(S, pz, customP; sweep=false, threads = threads)
+    hb_ind = QECInduced.check_induced_channel(S, pz, channelParamFunc; sweep=false, threads = threads)
     return hb_ind
 end 
 
 # helper: compute hb_induced - hashing
-function diff_f(n, p, customP)
-    hb = all_z_code_check(n, p, customP)
-    h  = hashing_calc(p, customP)
+function diff_f(n, p, channelParamFunc)
+    hb = all_z_code_check(n, p, channelParamFunc)
+    h  = hashing_calc(p, channelParamFunc)
     return hb - h
 end
 
 # helper: average a few evaluations to reduce sign jitter
-function diff_mean(n, p, customP; reps::Int=3)
+function diff_mean(n, p, channelParamFunc; reps::Int=3)
     s = 0.0
     for _ in 1:reps
-        s += diff_f(n, p, customP)
+        s += diff_f(n, p, channelParamFunc)
     end
     return s / reps
 end
 
 # helper: estimate noise (peak-to-peak) and mean at a point
-function estimate_noise(n, p, customP; reps::Int=7)
+function estimate_noise(n, p, channelParamFunc; reps::Int=7)
     vals = Vector{Float64}(undef, reps)
     for i in 1:reps
-        vals[i] = diff_f( n, p, customP)
+        vals[i] = diff_f( n, p, channelParamFunc)
     end
     return (maximum(vals) - minimum(vals)), sum(vals) / reps
 end
 
 # bracket a sign change around p0 by scanning outward
-function bracket_root(n, p0, customP;
+function bracket_root(n, p0, channelParamFunc;
                       step::Float64=1e-3, max_steps::Int=2000, reps::Int=3)
 
-    f0 = diff_mean(n, p0, customP; reps=reps)
+    f0 = diff_mean(n, p0, channelParamFunc; reps=reps)
 
     # Scan upward from p0
     p_prev, f_prev = p0, f0
     for k in 1:max_steps
         p = p0 + k*step
-        f = diff_mean(n, p, customP; reps=reps)
+        f = diff_mean(n, p, channelParamFunc; reps=reps)
         if sign(f) != sign(f_prev)
             return (p_prev, p)  # bracket [p_prev, p]
         end
@@ -81,7 +81,7 @@ function bracket_root(n, p0, customP;
         if p < 0
             break
         end
-        f = diff_mean(n, p, customP; reps=reps)
+        f = diff_mean(n, p, channelParamFunc; reps=reps)
         if sign(f) != sign(f_prev)
             return (p, p_prev)  # bracket [p, p_prev]
         end
@@ -91,14 +91,14 @@ function bracket_root(n, p0, customP;
     error("Could not bracket a sign change for n=$n starting at p0=$p0")
 end
 
-function bracket_root_local(n, p0, customP;
+function bracket_root_local(n, p0, channelParamFunc;
                             step::Float64=1e-3,
                             max_steps::Int=500,
                             reps::Int=3,
                             p_min::Float64=0.0,
                             p_max::Float64=0.5)
 
-    f0 = safe_diff_mean(n, p0, customP; reps=reps)
+    f0 = safe_diff_mean(n, p0, channelParamFunc; reps=reps)
     if !isfinite(f0)
         error("f(p0) is not finite for n=$n at p0=$p0")
     end
@@ -113,7 +113,7 @@ function bracket_root_local(n, p0, customP;
         # Right step
         pR_new = p0 + k*step
         if pR_new <= p_max
-            fR_new = safe_diff_mean(n, pR_new, customP; reps=reps)
+            fR_new = safe_diff_mean(n, pR_new, channelParamFunc; reps=reps)
             if isfinite(fR_new) && sign(fR_new) != sign(fR)
                 return (pR, pR_new)
             end
@@ -125,7 +125,7 @@ function bracket_root_local(n, p0, customP;
         # Left step
         pL_new = p0 - k*step
         if pL_new >= p_min
-            fL_new = safe_diff_mean(n, pL_new, customP; reps=reps)
+            fL_new = safe_diff_mean(n, pL_new, channelParamFunc; reps=reps)
             if isfinite(fL_new) && sign(fL_new) != sign(fL)
                 return (pL_new, pL)
             end
@@ -140,12 +140,12 @@ end
 
 
 # bisection inside a bracket; returns smallest p with diff >= 0
-function bisect_threshold(n, p_lo, p_hi, customP;
+function bisect_threshold(n, p_lo, p_hi, channelParamFunc;
                           p_tol::Float64=1e-6, reps::Int=7)
 
     # We will enforce invariant: f(lo) < 0, f(hi) > 0
-    noise_lo, f_lo = estimate_noise(n, p_lo, customP; reps=reps)
-    noise_hi, f_hi = estimate_noise(n, p_hi, customP; reps=reps)
+    noise_lo, f_lo = estimate_noise(n, p_lo, channelParamFunc; reps=reps)
+    noise_hi, f_hi = estimate_noise(n, p_hi, channelParamFunc; reps=reps)
 
     # If bracket orientation is flipped, swap
     if f_lo > 0 && f_hi < 0
@@ -161,7 +161,7 @@ function bisect_threshold(n, p_lo, p_hi, customP;
     while (p_hi - p_lo) > p_tol
         p_mid = (p_lo + p_hi)/2
 
-        noise_mid, f_mid = estimate_noise(n, p_mid, customP; reps=reps)
+        noise_mid, f_mid = estimate_noise(n, p_mid, channelParamFunc; reps=reps)
 
         # Because hb_induced and hashing are ~0.5, use a *relative* noise stop too:
         # stop if mean is smaller than half the measured jitter (or very tiny floor)
@@ -182,9 +182,9 @@ function bisect_threshold(n, p_lo, p_hi, customP;
     return p_hi  # smallest p in bracket with diff >= 0
 end
 
-function safe_diff(n, p, customP)
-    hb = all_z_code_check(n, p, customP)
-    h  = hashing_calc(p, customP)
+function safe_diff(n, p, channelParamFunc)
+    hb = all_z_code_check(n, p, channelParamFunc)
+    h  = hashing_calc(p, channelParamFunc)
     d  = hb - h
     if !isfinite(d)
         return NaN
@@ -192,11 +192,11 @@ function safe_diff(n, p, customP)
     return d
 end
 
-function safe_diff_mean(n, p, customP; reps::Int=3)
+function safe_diff_mean(n, p, channelParamFunc; reps::Int=3)
     s = 0.0
     cnt = 0
     for _ in 1:reps
-        d = safe_diff(n, p, customP)
+        d = safe_diff(n, p, channelParamFunc)
         if isfinite(d)
             s += d
             cnt += 1
@@ -206,7 +206,7 @@ function safe_diff_mean(n, p, customP; reps::Int=3)
 end
 
 
-function root_finder(n_max, customP; pz=0.23,
+function root_finder(n_max, channelParamFunc; pz=0.23,
                          scan_step=1e-3, scan_reps=1,
                          bisect_reps=1, p_tol=1e-6,
                          p_min=0.0, p_max=0.35)  # <- tighten this!
@@ -218,12 +218,12 @@ function root_finder(n_max, customP; pz=0.23,
         println("Starting scan at p0 = $pz")
 
         elapsed_total = @elapsed begin
-            p_lo, p_hi = bracket_root_local(n, pz, customP;
+            p_lo, p_hi = bracket_root_local(n, pz, channelParamFunc;
                                             step=scan_step, max_steps=800,
                                             reps=scan_reps,
                                             p_min=p_min, p_max=p_max)
 
-            p_star = bisect_threshold(n, p_lo, p_hi, customP;
+            p_star = bisect_threshold(n, p_lo, p_hi, channelParamFunc;
                                       p_tol=p_tol, reps=bisect_reps)
 
             smallest_p[n] = p_star

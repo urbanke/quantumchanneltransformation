@@ -59,15 +59,15 @@ end
 
 
 
-function sweep_custom_grid_exact(H, Lx, Lz, G, ps, customP; threads::Int=nthreads())
+function sweep_custom_grid_exact(H, Lx, Lz, G, ps, channelParamFunc; threads::Int=nthreads())
     ps_vec = collect(ps)  # Ensure it's a vector
     m = length(ps_vec)
     out = zeros(Float64, m, 3)
     
     @threads for i in 1:m
         p = ps_vec[i]
-        pd = customP(p)
-        pd_tuple = customP(p; tuple=true)
+        pd = channelParamFunc(p)
+        pd_tuple = channelParamFunc(p; tuple=true)
         c = 1 - H1(pd)
         hb = Induced.induced_channel_and_hashing_bound(H, Lx, Lz, G, pd_tuple)        
         out[i,1] = p
@@ -79,14 +79,14 @@ function sweep_custom_grid_exact(H, Lx, Lz, G, ps, customP; threads::Int=nthread
 end
 
 
-function sweep_hashing_grid(ps, customP)
+function sweep_hashing_grid(ps, channelParamFunc)
     ps_vec = collect(ps)                 # Convert to vector if needed
     m = length(ps_vec)                  
     out = zeros(Float64, m)              
     
     for i in 1:m
         p = ps_vec[i]
-        pd = customP(p)
+        pd = channelParamFunc(p)
         c = 1 - H1(pd)
         out[i] = c                       # Assign directly to vector element
     end
