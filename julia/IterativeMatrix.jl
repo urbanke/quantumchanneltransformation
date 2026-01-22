@@ -1,15 +1,20 @@
-# ============================================
-# Enumerate all binary (n-k) × (2n) matrices
-# in the standard sub-block form, for all r
-# ============================================
+module IterativeMatrix
+export iterate_standard_block_matrices_optimized, All_Codes_DFS_parallel, All_Codes_DFS, count_standard_block_matrices
+
+
 include("src/Symplectic.jl")
 include("src/SGS.jl")
+include("EnvelopeUtil.jl")
 
-using .Symplectic, .SGS
-using QECInduced, .Symplectic, .SGS
+using .Symplectic, .SGS, .EnvelopeUtil
+using QECInduced
 using Base.Threads
 using Plots
 using LinearAlgebra
+using Random
+
+
+
 
 # Utilities
 identity_matrix(m::Int) = begin
@@ -21,6 +26,7 @@ identity_matrix(m::Int) = begin
 end
 
 zero_matrix(m::Int, n::Int) = zeros(Int, m, n)
+
 
 # Iterate all binary matrices of size m×n (2^(m*n) total)
 function each_binary_matrix(m::Int, n::Int)
@@ -44,6 +50,47 @@ function each_binary_matrix(m::Int, n::Int)
         fillpos(1)
     end
 end
+
+
+
+# -------------------------------
+# Counting utility (how many total)
+# -------------------------------
+"""
+    count_standard_block_matrices(n, k; r=nothing)
+
+Return total count of emitted matrices.
+
+If r === nothing: sums over all r = 0..(n-k)
+If r is specified: returns count for that specific r value
+
+For each r, number of variable bits is:
+  Left:  r*(s-r) + r*k
+  Right: r*r + r*(s-r) + r*k + (s-r)*r + (s-r)*k
+Total per r: T(r) = 3*r*s - 2*r^2 + k*s, where s = n-k.
+"""
+function count_standard_block_matrices(n::Int, k::Int; r::Union{Int,Nothing}=nothing)
+    @assert 0 ≤ k ≤ n "Require 0 ≤ k ≤ n"
+    s = n - k
+    
+    r_range = if r === nothing
+        0:s
+    else
+        @assert 0 ≤ r ≤ s "Require 0 ≤ r ≤ n-k"
+        r:r
+    end
+    
+    total = 0
+    for r_val in r_range
+        # bits = number of variable entries for this r
+        s1 = n - k - r_val
+        # bits = number of variable entries for this r
+        bits = s1*r_val + k*r_val + r_val*r_val + s1*r_val + k*r_val + s1*r_val + s1*k
+        total += 2^bits
+    end
+    return total
+end
+
 
 # -------------------------------
 # Left half: s × n
@@ -111,26 +158,7 @@ function build_full_matrix(n::Int, k::Int, r::Int,
 end
 
 # -------------------------------
-# Main enumerator (lazy)
-# Emits NamedTuple: (M, r, blocks=...)
-# -------------------------------
-"""
-    iterate_standard_block_matrices(n, k; r=nothing, visit=nothing)
-
-Enumerate all binary matrices of size (n-k) × (2n) in the standard sub-block form.
-
-If `r === nothing`, iterates over all r = 0..(n-k).
-If `r` is specified, only generates matrices for that specific value of r.
-
-If `visit === nothing`, returns a `Channel{NamedTuple}` yielding:
-  (M = Matrix{Int}, r = Int,
-   blocks = (A1, A2, B, C1, C2, D, E))
-
-If `visit` is a function `(info)->nothing`, it is called for each matrix
-and the function returns `nothing`.
-"""
-# -------------------------------
-# Optimized orthogonality checking
+# orthogonality checking
 # -------------------------------
 """
     check_symplectic_orthogonality(left_row, right_row)
@@ -295,155 +323,239 @@ function iterate_standard_block_matrices_optimized(n::Int, k::Int; r::Union{Int,
     end
 end
 
-# -------------------------------
-# Main enumerator (lazy) with pruning
-# -------------------------------
+
 """
-    iterate_standard_block_matrices(n, k; r=nothing, visit=nothing, check_orthogonality=true)
+    All_Codes_DFS(customP, n, k; pz=nothing, r_specific=nothing)
 
-Enumerate all binary matrices of size (n-k) × (2n) in the standard sub-block form.
+Adapted version to work with the standard block matrix enumeration.
 
-If `r === nothing`, iterates over all r = 0..(n-k).
-If `r` is specified, only generates matrices for that specific value of r.
+Parameters:
+- customP: The type of quantum channel
+- n: Code parameter n
+- k: Code parameter k (s = n-k is the number of rows)
+- pz: Optional depolarization parameter (computed if not provided)
+- r_specific: Optional specific value of r to test (tests all r if nothing)
 
-If `check_orthogonality=true`, prunes the search tree by checking symplectic orthogonality
-constraints as blocks are built up.
-
-If `visit === nothing`, returns a `Channel{NamedTuple}` yielding:
-  (M = Matrix{Int}, r = Int,
-   blocks = (A1, A2, B, C1, C2, D, E))
-
-If `visit` is a function `(info)->nothing`, it is called for each matrix
-and the function returns `nothing`.
+Returns:
+- hb_best: Best value found
+- S_best: Best stabilizer matrix found
+- r_best: The r value that gave the best result
 """
-function iterate_standard_block_matrices(n::Int, k::Int; r::Union{Int,Nothing}=nothing, visit=nothing, check_orthogonality::Bool=true)
-    @assert 0 ≤ k ≤ n "Require 0 ≤ k ≤ n"
-    s = n - k
+function All_Codes_DFS(customP, n, k; pz=nothing, r_specific=nothing, points=15, δ = .3, newBest = nothing, threads = Threads.nthreads(), trials = 1e6, useTrials = false, pz_range_override = nothing, concated = nothing, placement = "inner") 
+    s = n - k  # Number of rows in the (n-k) × (2n) matrix
     
-    # Determine range of r values
-    r_range = if r === nothing
-        0:s
+    # Initialize best trackers for each grid point
+
+    S_best = [falses(s, 2n) for _ in 1:points]  # Best matrix at each grid point
+    r_best = fill(-1, points)  # Best r value at each grid point
+    
+    # Compute pz if not provided
+    if pz === nothing 
+        pz = findZeroRate(f, 0, 0.5, customP; maxiter=1000)
+    end 
+
+    if pz_range_override === nothing 
+        pz_range = range(.236,.272, length=points)
+        pz_range = range(pz - pz*δ/2, pz + pz*δ/4, length=points)   
+    else 
+        pz_range = pz_range_override 
+    end  
+
+    #pz_range = range(.236,.272, length=points)
+    #pz_range = range(0.2334285714285714 - 0.0025714285714285856, 0.2334285714285714 + 0.0025714285714285856, length = points)
+
+    if newBest === nothing 
+        hb_best = QECInduced.sweep_hashing_grid(pz_range, customP)
+    else 
+        hb_best = newBest
+    end 
+    println(hb_best)
+    println("=" ^ 70)
+    println("Generating binary matrices ($s × $(2*n)) in standard block form")
+    println("Parameters: n=$n, k=$k, s=$s, grid_points=$points")
+
+    if r_specific !== nothing
+        println("Testing only r=$r_specific")
     else
-        @assert 0 ≤ r ≤ s "Require 0 ≤ r ≤ n-k"
-        r:r  # Single value range
+        println("Testing all r values from 0 to $s")
     end
-
-    function drive(ch::Union{Channel,Nothing})
-        for r_val in r_range
-            r1 = r_val
-            r2 = s - r_val
-
-            # Build blocks incrementally with orthogonality checks
-            
-            for A1 in each_binary_matrix(r1, r2)      # r × (s-r)
-                for A2 in each_binary_matrix(r1, k)       # r × k
-                    # After A1, A2: we have the top-left block
-                    # Left top = [I_r A1 A2]
-                    I_r = identity_matrix(r1)
-                    left_top = hcat(I_r, A1, A2)
-                    
-                    for B in each_binary_matrix(r1, r1)      # r × r
-                        for C1 in each_binary_matrix(r1, r2)      # r × (s-r)
-                            for C2 in each_binary_matrix(r1, k)       # r × k
-                                # Right top = [B C1 C2]
-                                right_top = hcat(B, C1, C2)
-                                
-                                # Check orthogonality of top rows (only among themselves so far)
-                                if check_orthogonality && !check_partial_matrix_orthogonality(left_top, right_top)
-                                    # Top rows fail orthogonality - skip all D, E combinations
-                                    continue
-                                end
-                                
-                                for D in each_binary_matrix(r2, r1)      # (s-r) × r
-                                    for E in each_binary_matrix(r2, k)       # (s-r) × k
-                                        # Now check full matrix orthogonality
-                                        if check_orthogonality
-                                            # Bottom left = [0 0 0]
-                                            # Bottom right = [D I_(s-r) E]
-                                            left_bottom = hcat(zero_matrix(r2, r1), zero_matrix(r2, r2), zero_matrix(r2, k))
-                                            I_r2 = identity_matrix(r2)
-                                            right_bottom = hcat(D, I_r2, E)
-                                            
-                                            # Build full left and right
-                                            left_full = vcat(left_top, left_bottom)
-                                            right_full = vcat(right_top, right_bottom)
-                                            
-                                            if !check_partial_matrix_orthogonality(left_full, right_full)
-                                                # Full matrix fails - skip this combination
-                                                continue
-                                            end
-                                        end
-                                        
-                                        # All checks passed - build and emit matrix
-                                        M = build_full_matrix(n, k, r_val, A1, A2, B, C1, C2, D, E)
-                                        info = (M=M, r=r_val, blocks=(A1=A1, A2=A2, B=B, C1=C1, C2=C2, D=D, E=E))
-                                        if visit === nothing
-                                            put!(ch, info)
-                                        else
-                                            visit(info)
-                                        end
-                                    end
-                                end
-                            end
-                        end
-                    end
-                end
+    println("pz range: [$(pz_range[1]), $(pz_range[end])]")
+    println("=" ^ 70)
+    
+    # Calculate total possible without constraints
+    total_possible_no_constraints = count_standard_block_matrices(n, k; r=r_specific)
+    println("\nTotal matrices without orthogonality constraints: $total_possible_no_constraints")
+    
+    count = 0
+    count_by_r = Dict{Int,Int}()
+    last_print_count = 0
+    print_interval = max(1, div(total_possible_no_constraints, 20))  # Print ~20 times
+    
+    println("\nStarting enumeration with orthogonality constraints...\n")
+    
+    # Use the optimized iterator with orthogonality checking
+    for info in iterate_standard_block_matrices_optimized(n, k; r=r_specific)
+        count += 1
+        r_val = info.r
+        count_by_r[r_val] = get(count_by_r, r_val, 0) + 1
+        
+        # Convert to Bool matrix
+        S = Matrix{Bool}(info.M)
+        
+        if !isnothing(concated) 
+            if placement == "inner"
+                S = concat_stabilizers_bool(S, concated)
+            else 
+                S = concat_stabilizers_bool(concated, S)
             end
         end
-        nothing
+        # Check the induced channel at all grid points
+        hb_grid = QECInduced.check_induced_channel(S, pz, customP; sweep=true, ps=pz_range, threads = threads)
+        # Find which grid points improved
+        improved_indices = findall(hb_grid .> (hb_best .+ eps()))
+
+        
+        # Update best for each improved point
+        if !isempty(improved_indices)
+            for idx in improved_indices
+                hb_best[idx] = hb_grid[idx]
+                S_best[idx] = copy(S)
+                r_best[idx] = r_val
+            end
+            
+            println("\n" * "=" ^ 70)
+            println("NEW BEST FOUND! (Matrix #$count, r=$r_val)")
+            println("Improved at $(length(improved_indices)) grid point(s): $improved_indices")
+            println("\nGrid point details:")
+            for idx in improved_indices
+                println("  Point $idx: pz=$(round(pz_range[idx], digits=4)), hb=$(round(hb_best[idx], digits=6))")
+            end
+            println("\nS_best (showing first improved point) =")
+            println(Symplectic.build_from_bits(S_best[improved_indices[1]]))
+            println("=" ^ 70 * "\n")
+        end
+
+        if (count > trials) && useTrials
+            break
+        end 
+    end
+    
+    println("\n" * "=" ^ 70)
+    println("SEARCH COMPLETE")
+    println("=" ^ 70)
+    println("Valid matrices found (satisfying orthogonality): $count")
+    println("Total possible (without constraints): $total_possible_no_constraints")
+    println("Efficiency gain: $(round((1 - count/total_possible_no_constraints)*100, digits=1))% pruned")
+    
+    println("\nBreakdown by r:")
+    for r_val in sort(collect(keys(count_by_r)))
+        println("  r=$r_val: $(count_by_r[r_val]) matrices checked")
+    end
+    return hb_best, S_best#, r_best
+end
+
+
+
+
+"""
+    All_Codes_DFS_parallel(customP, n, k; pz=nothing, use_threads=true)
+
+Parallel version that searches all r values independently using Julia threads.
+Can be more efficient since different r values can be checked in parallel.
+
+To use threading, start Julia with: `julia -t auto` or `julia -t 8` (for 8 threads)
+Check available threads with: `Threads.nthreads()`
+"""
+
+function All_Codes_DFS_parallel(customP, n, k; pz=nothing, use_threads=true, points = 15, δ = .3, newBest = nothing, trials = 1e6, useTrials = false, pz_range_override = nothing, concated = nothing, placement = "inner")  
+    s = n - k
+
+    if pz === nothing 
+        pz = findZeroRate(f, 0, 0.5, customP; maxiter=1000)
     end
 
-    if visit === nothing
-        return Channel{NamedTuple}() do ch
-            drive(ch)
+
+    if pz_range_override === nothing 
+        pz_range = range(.236,.272, length=points)
+        pz_range = range(pz - pz*δ/2, pz + pz*δ/4, length=points)   
+    else 
+        pz_range = pz_range_override 
+    end  
+
+    n_threads = Threads.nthreads()
+    println("=" ^ 70)
+    println("PARALLEL SEARCH: Testing each r value independently")
+    println("Parameters: n=$n, k=$k, s=$s")
+    println("Available threads: $n_threads")
+    println("Using threads: $use_threads")
+    println("=" ^ 70)
+    
+    if use_threads && n_threads == 1
+        @warn "Only 1 thread available. Start Julia with `julia -t auto` for multi-threading."
+    end
+    
+    # Pre-allocate results array
+    r_values = collect(0:s)
+    n_r = length(r_values)
+    results = Vector{Any}(undef, n_r)
+    s_best = [falses(s, 2n) for _ in 1:points]  # Best matrix at each grid point
+    
+    if use_threads && n_threads > 1
+        # Parallel execution using threads
+        println("\nStarting parallel search across $n_r r values using $n_threads threads...")
+        
+        Threads.@threads for i in 1:n_r
+            r_val = r_values[i]
+            println("Thread $(Threads.threadid()): Starting r=$r_val")
+            
+            hb, S = All_Codes_DFS(customP, n, k; pz=pz, r_specific=r_val, δ = δ, newBest = newBest, points = points, threads = 0, trials = trials, useTrials = useTrials, pz_range_override = pz_range, concated = concated, placement = placement)
+            results[i] = (r=r_val, hb=hb, S=S)
+            
+            println("Thread $(Threads.threadid()): Completed r=$r_val, hb=$hb")
         end
     else
-        drive(nothing)
-        return nothing
+        # Sequential execution (fallback)
+        println("\nRunning sequential search (no threading)...")
+        for i in 1:n_r
+            r_val = r_values[i]
+            println("\n--- Starting search for r=$r_val ---")
+            
+            hb, S = All_Codes_DFS(customP, n, k; pz=pz, r_specific=r_val, points = points,  δ = δ, newBest = newBest, trials = trials, useTrials = useTrials, pz_range_override = pz_range, concated = concated, placement = placement)
+            results[i] = (r=r_val, hb=hb, S=S)
+        end
     end
+    total_best = QECInduced.sweep_hashing_grid(pz_range, customP)
+    for i in 1:n_r 
+        replaceIndices = findall(results[i].hb .> total_best)
+        if !isempty(replaceIndices)
+            s_best[replaceIndices] = (results[i].S)[replaceIndices]
+            total_best = max.(total_best, results[i].hb)
+        end
+    end
+    # Find overall best
+    #best_idx = argmax([res.hb for res in results])
+    #best_result = results[best_idx]
+    
+    println("\n" * "=" ^ 70)
+    println("PARALLEL SEARCH COMPLETE")
+    println("-" ^ 70)
+    println("Results by r value:")
+    for res in results
+        println("  r=$(res.r): hb=$(res.hb)")
+    end
+    println("-" ^ 70)
+    println("OVERALL BEST:")
+    #println("  r_best = $(best_result.r)")
+    println("  overall_best = $(total_best)")
+    println("=" ^ 70)
+    
+    return total_best, s_best
 end
 
-# -------------------------------
-# Counting utility (how many total)
-# -------------------------------
-"""
-    count_standard_block_matrices(n, k; r=nothing)
 
-Return total count of emitted matrices.
-
-If r === nothing: sums over all r = 0..(n-k)
-If r is specified: returns count for that specific r value
-
-For each r, number of variable bits is:
-  Left:  r*(s-r) + r*k
-  Right: r*r + r*(s-r) + r*k + (s-r)*r + (s-r)*k
-Total per r: T(r) = 3*r*s - 2*r^2 + k*s, where s = n-k.
-"""
-function count_standard_block_matrices(n::Int, k::Int; r::Union{Int,Nothing}=nothing)
-    @assert 0 ≤ k ≤ n "Require 0 ≤ k ≤ n"
-    s = n - k
-    
-    r_range = if r === nothing
-        0:s
-    else
-        @assert 0 ≤ r ≤ s "Require 0 ≤ r ≤ n-k"
-        r:r
-    end
-    
-    total = 0
-    for r_val in r_range
-        # bits = number of variable entries for this r
-        s1 = n - k - r_val
-        # bits = number of variable entries for this r
-        bits = s1*r_val + k*r_val + r_val*r_val + s1*r_val + k*r_val + s1*r_val + s1*k
-        println(bits)
-        total += 2^bits
-    end
-    return total
-end
 
 # ============================================
-# Example Usage
+# Test Functs
 # ============================================
 
 function test_each_binary_matrix()
@@ -467,317 +579,6 @@ end
 
 
 """
-    All_Codes_DFS(ChannelType, n, k; pz=nothing, r_specific=nothing)
-
-Adapted version to work with the standard block matrix enumeration.
-
-Parameters:
-- ChannelType: The type of quantum channel
-- n: Code parameter n
-- k: Code parameter k (s = n-k is the number of rows)
-- pz: Optional depolarization parameter (computed if not provided)
-- r_specific: Optional specific value of r to test (tests all r if nothing)
-
-Returns:
-- hb_best: Best value found
-- S_best: Best stabilizer matrix found
-- r_best: The r value that gave the best result
-"""
-function All_Codes_DFS(ChannelType, n, k; pz=nothing, r_specific=nothing)
-    s = n - k  # Number of rows in the (n-k) × (2n) matrix
-    
-    hb_best = -1.0e9 # close to -inf so that anything beats it 
-    S_best = falses(s, 2n)
-    r_best = -1
-    
-    # Compute pz if not provided
-    if pz === nothing 
-        pz = findZeroRate(f, 0, 0.5; maxiter=1000, ChannelType=ChannelType)
-    end 
-    
-    println("=" ^ 70)
-    println("Generating binary matrices ($s × $(2*n)) in standard block form")
-    println("Parameters: n=$n, k=$k, s=$s")
-    if r_specific !== nothing
-        println("Testing only r=$r_specific")
-    else
-        println("Testing all r values from 0 to $s")
-    end
-    println("=" ^ 70)
-    
-    # Calculate total possible without constraints
-    total_possible_no_constraints = count_standard_block_matrices(n, k; r=r_specific)
-    println("\nTotal matrices without orthogonality constraints: $total_possible_no_constraints")
-    
-    count = 0
-    count_by_r = Dict{Int,Int}()
-    last_print_count = 0
-    print_interval = max(1, div(total_possible_no_constraints, 20))  # Print ~20 times
-    
-    println("\nStarting enumeration with orthogonality constraints...\n")
-    
-    # Use the optimized iterator with orthogonality checking
-    for info in iterate_standard_block_matrices_optimized(n, k; r=r_specific)
-        count += 1
-        r_val = info.r
-        count_by_r[r_val] = get(count_by_r, r_val, 0) + 1
-        
-        # Convert to Bool matrix (your code expects Bool)
-        S = Matrix{Bool}(info.M)
-        
-        # Check the induced channel
-        hb_temp = QECInduced.check_induced_channel(S, pz; ChannelType=ChannelType)
-        
-        # Update best if improved
-        if hb_temp >= hb_best
-            hb_best = hb_temp
-            S_best = copy(S)
-            r_best = r_val
-            
-            println("\n" * "=" ^ 70)
-            println("NEW BEST FOUND! (Matrix #$count, r=$r_val)")
-            println("pz = $pz")
-            println("hb_best = $hb_best")
-            println("S_best =")
-            println(Symplectic.build_from_bits(S_best))
-            println("=" ^ 70 * "\n")
-        end
-        
-        # Periodic progress updates
-        if count - last_print_count >= print_interval
-            println("Progress: $count matrices checked (r=$r_val, best_so_far=$hb_best)")
-            last_print_count = count
-        end
-    end
-    
-    println("\n" * "=" ^ 70)
-    println("SEARCH COMPLETE")
-    println("=" ^ 70)
-    println("Valid matrices found (satisfying orthogonality): $count")
-    println("Total possible (without constraints): $total_possible_no_constraints")
-    println("Efficiency gain: $(round((1 - count/total_possible_no_constraints)*100, digits=1))% pruned")
-    
-    println("\nBreakdown by r:")
-    for r_val in sort(collect(keys(count_by_r)))
-        println("  r=$r_val: $(count_by_r[r_val]) matrices checked")
-    end
-    
-    println("\nBest result:")
-    println("  r_best = $r_best")
-    println("  hb_best = $hb_best")
-    println("  pz = $pz")
-    println("=" ^ 70)
-    
-    return hb_best, S_best, r_best
-end
-
-
-"""
-    All_Codes_DFS_parallel(ChannelType, n, k; pz=nothing, use_threads=true)
-
-Parallel version that searches all r values independently using Julia threads.
-Can be more efficient since different r values can be checked in parallel.
-
-To use threading, start Julia with: `julia -t auto` or `julia -t 8` (for 8 threads)
-Check available threads with: `Threads.nthreads()`
-"""
-
-function All_Codes_DFS_parallel(ChannelType, n, k; pz=nothing, use_threads=true)
-    s = n - k
-    
-    if pz === nothing 
-        pz = findZeroRate(f, 0, 0.5; maxiter=1000, ChannelType=ChannelType)
-    end
-    
-    n_threads = Threads.nthreads()
-    println("=" ^ 70)
-    println("PARALLEL SEARCH: Testing each r value independently")
-    println("Parameters: n=$n, k=$k, s=$s")
-    println("Available threads: $n_threads")
-    println("Using threads: $use_threads")
-    println("=" ^ 70)
-    
-    if use_threads && n_threads == 1
-        @warn "Only 1 thread available. Start Julia with `julia -t auto` for multi-threading."
-    end
-    
-    # Pre-allocate results array
-    r_values = collect(0:s)
-    n_r = length(r_values)
-    results = Vector{Any}(undef, n_r)
-    
-    if use_threads && n_threads > 1
-        # Parallel execution using threads
-        println("\nStarting parallel search across $n_r r values using $n_threads threads...")
-        
-        Threads.@threads for i in 1:n_r
-            r_val = r_values[i]
-            println("Thread $(Threads.threadid()): Starting r=$r_val")
-            
-            hb, S, r = All_Codes_DFS(ChannelType, n, k; pz=pz, r_specific=r_val)
-            results[i] = (r=r_val, hb=hb, S=S)
-            
-            println("Thread $(Threads.threadid()): Completed r=$r_val, hb=$hb")
-        end
-    else
-        # Sequential execution (fallback)
-        println("\nRunning sequential search (no threading)...")
-        for i in 1:n_r
-            r_val = r_values[i]
-            println("\n--- Starting search for r=$r_val ---")
-            
-            hb, S, r = All_Codes_DFS(ChannelType, n, k; pz=pz, r_specific=r_val)
-            results[i] = (r=r_val, hb=hb, S=S)
-        end
-    end
-    
-    # Find overall best
-    best_idx = argmax([res.hb for res in results])
-    best_result = results[best_idx]
-    
-    println("\n" * "=" ^ 70)
-    println("PARALLEL SEARCH COMPLETE")
-    println("-" ^ 70)
-    println("Results by r value:")
-    for res in results
-        println("  r=$(res.r): hb=$(res.hb)")
-    end
-    println("-" ^ 70)
-    println("OVERALL BEST:")
-    println("  r_best = $(best_result.r)")
-    println("  hb_best = $(best_result.hb)")
-    println("=" ^ 70)
-    
-    return best_result.hb, best_result.S, best_result.r
-end
-
-
-"""
-    All_Codes_DFS_parallel_with_progress(ChannelType, n, k; pz=nothing)
-
-Parallel version with thread-safe progress tracking.
-Uses atomic counters to track progress across threads.
-"""
-function All_Codes_DFS_parallel_with_progress(ChannelType, n, k; pz=nothing)
-    s = n - k
-    
-    if pz === nothing 
-        pz = findZeroRate(f, 0, 0.5; maxiter=1000, ChannelType=ChannelType)
-    end
-    
-    n_threads = Threads.nthreads()
-    println("=" ^ 70)
-    println("PARALLEL SEARCH WITH PROGRESS TRACKING")
-    println("Parameters: n=$n, k=$k, s=$s")
-    println("Threads: $n_threads")
-    println("=" ^ 70)
-    
-    # Thread-safe progress tracking
-    completed = Threads.Atomic{Int}(0)
-    total_r = s + 1
-    
-    # Pre-allocate results
-    r_values = collect(0:s)
-    results = Vector{Any}(undef, total_r)
-    
-    # Progress reporter task
-    progress_task = @async begin
-        while completed[] < total_r
-            sleep(5)  # Update every 5 seconds
-            done = completed[]
-            if done < total_r
-                println("[Progress] Completed $done/$total_r r values...")
-            end
-        end
-    end
-    
-    println("\nStarting parallel search...")
-    start_time = time()
-    
-    Threads.@threads for i in 1:total_r
-        r_val = r_values[i]
-        
-        hb, S, r = All_Codes_DFS(ChannelType, n, k; pz=pz, r_specific=r_val)
-        results[i] = (r=r_val, hb=hb, S=S)
-        
-        # Update progress atomically
-        Threads.atomic_add!(completed, 1)
-        done = completed[]
-        
-        println("✓ Thread $(Threads.threadid()): r=$r_val complete ($done/$total_r), hb=$hb")
-    end
-    
-    elapsed_time = time() - start_time
-    
-    # Wait for progress task to finish
-    wait(progress_task)
-    
-    # Find overall best
-    best_idx = argmax([res.hb for res in results])
-    best_result = results[best_idx]
-    
-    println("\n" * "=" ^ 70)
-    println("PARALLEL SEARCH COMPLETE")
-    println("Total time: $(round(elapsed_time, digits=2)) seconds")
-    println("-" ^ 70)
-    println("Results by r value:")
-    for res in results
-        println("  r=$(res.r): hb=$(round(res.hb, digits=6))")
-    end
-    println("-" ^ 70)
-    println("OVERALL BEST:")
-    println("  r_best = $(best_result.r)")
-    println("  hb_best = $(best_result.hb)")
-    println("=" ^ 70)
-    
-    return best_result.hb, best_result.S, best_result.r
-end
-
-
-"""
-    check_threading_setup()
-
-Utility function to check if threading is properly configured.
-"""
-function check_threading_setup()
-    n_threads = Threads.nthreads()
-    
-    println("=" ^ 70)
-    println("JULIA THREADING CONFIGURATION")
-    println("=" ^ 70)
-    println("Number of threads: $n_threads")
-    
-    if n_threads == 1
-        println("\n⚠️  WARNING: Only 1 thread available!")
-        println("\nTo enable multi-threading, restart Julia with:")
-        println("  julia -t auto          # Use all available cores")
-        println("  julia -t 4             # Use 4 threads")
-        println("  julia -t 8             # Use 8 threads")
-        println("\nOr set the environment variable:")
-        println("  export JULIA_NUM_THREADS=auto")
-    else
-        println("\n✓ Multi-threading is enabled!")
-        println("\nTesting thread distribution:")
-        
-        counts = zeros(Int, n_threads)
-        Threads.@threads for i in 1:1000
-            tid = Threads.threadid()
-            counts[tid] += 1
-        end
-        
-        println("\nWork distribution across threads:")
-        for (tid, count) in enumerate(counts)
-            if count > 0
-                bar = "█" ^ div(count, 10)
-                println("  Thread $tid: $count iterations $bar")
-            end
-        end
-    end
-    println("=" ^ 70)
-end
-
-
-"""
     compare_enumeration_methods(n, k)
 
 Compare the old and new enumeration methods to verify correctness.
@@ -813,50 +614,8 @@ function compare_enumeration_methods(n, k)
 end
 
 
-"""
-    compare_enumeration_methods(n, k)
-
-Compare the old and new enumeration methods to verify correctness.
-Only for small n, k where enumeration is feasible.
-"""
-function compare_enumeration_methods(n, k)
-    s = n - k
-    
-    println("=" ^ 70)
-    println("COMPARING ENUMERATION METHODS")
-    println("Parameters: n=$n, k=$k, s=$s")
-    println("=" ^ 70)
-    
-    # Count without orthogonality
-    println("\n1. Counting all matrices (no orthogonality)...")
-    count_all = 0
-    time_all = @elapsed begin
-        for info in iterate_standard_block_matrices_optimized(n, k)
-            # This uses the function that has orthogonality checking
-            # To count ALL, we'd need a version without checking
-            count_all += 1
-        end
-    end
-    
-    expected_all = count_standard_block_matrices(n, k)
-    
-    println("   Matrices with orthogonality: $count_all")
-    println("   Total possible (formula): $expected_all")
-    println("   Time: $(round(time_all * 1000, digits=2)) ms")
-    println("   Reduction: $(expected_all - count_all) matrices pruned by orthogonality")
-    
-    println("\n" * "=" ^ 70)
-end
 
 
-function main()
-    elapsed_time = @elapsed begin
-        n, k = 5, 2  # => s = n-k = 2; matrices are 2 × (2n) = 2 × 6
-        ChannelType = "Independent"
-        All_Codes_DFS_parallel(ChannelType, n, k)
-    end
-    println("Elapsed time: $elapsed_time seconds") 
-end
 
-# Run the main function
-main()
+
+end # module

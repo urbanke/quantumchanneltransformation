@@ -58,46 +58,18 @@ end
 
 
 
-function sweep_custom_grid(H, Lx, Lz, G, customP; p_min=0.0, p_max=1.0, step=0.01, threads::Int=nthreads())
-    ps = collect(range(p_min, p_max; step=step))
-    m = length(ps)
-    out = zeros(Float64, m, 3)
-    @threads for i in 1:m
-        p = ps[i]
-        pd = customP(p)#[customP[1], customP[2], customP[3], customP[4]]
-        c = 1-H1(pd)
-    #=pbar,=# hb = Induced.induced_channel_and_hashing_bound(H, Lx, Lz, G, customP(p; tuple=true))
-    out[i,1] = p
-    out[i,2] = hb
-        out[i,3] = c
-    end
-    out
-end
 
-
-function sweep_custom_grid_exact(H, Lx, Lz, G, ps, customP; depolarizing=false, independent=false, threads::Int=nthreads())
+function sweep_custom_grid_exact(H, Lx, Lz, G, ps, customP; threads::Int=nthreads())
     ps_vec = collect(ps)  # Ensure it's a vector
     m = length(ps_vec)
     out = zeros(Float64, m, 3)
     
     @threads for i in 1:m
         p = ps_vec[i]
-        
-        # Determine the channel probabilities
-        if depolarizing
-            pd = [1-p, p/3, p/3, p/3]
-            pd_tuple = (1-p, p/3, p/3, p/3)
-        elseif independent
-            pd = [(1-p)*(1-p), p*(1-p), p*(1-p), p*p]
-            pd_tuple = ((1-p)*(1-p), p*(1-p), p*(1-p), p*p)
-        else
-            pd = customP(p)
-            pd_tuple = customP(p; tuple=true)
-        end
-        
+        pd = customP(p)
+        pd_tuple = customP(p; tuple=true)
         c = 1 - H1(pd)
-        hb = Induced.induced_channel_and_hashing_bound(H, Lx, Lz, G, pd_tuple)
-        
+        hb = Induced.induced_channel_and_hashing_bound(H, Lx, Lz, G, pd_tuple)        
         out[i,1] = p
         out[i,2] = hb
         out[i,3] = c
@@ -107,20 +79,14 @@ function sweep_custom_grid_exact(H, Lx, Lz, G, ps, customP; depolarizing=false, 
 end
 
 
-function sweep_hashing_grid(ps, ChannelType; customP = nothing)
+function sweep_hashing_grid(ps, customP)
     ps_vec = collect(ps)                 # Convert to vector if needed
-    m = length(ps_vec)                   # Number of points
-    out = zeros(Float64, m)              # Change to 1D vector instead of (m, 1)
+    m = length(ps_vec)                  
+    out = zeros(Float64, m)              
     
     for i in 1:m
         p = ps_vec[i]
-        if ChannelType == "Depolarizing"
-            pd = [1 - p, p/3, p/3, p/3]
-        elseif ChannelType == "Independent"
-            pd = [(1 - p) * (1 - p), p * (1 - p), p * (1 - p), p * p]
-        else
-            pd = customP(p)
-        end
+        pd = customP(p)
         c = 1 - H1(pd)
         out[i] = c                       # Assign directly to vector element
     end

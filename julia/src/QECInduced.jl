@@ -22,15 +22,15 @@ using .ParallelSweep
 
 
 
-function findZeroRate(f, a, b; tol=1e-16, maxiter=1000, ChannelType = "Independent", customP = nothing)
-    fa, fb = f(a; ChannelType = ChannelType, customP = customP), f(b; ChannelType = ChannelType, customP = customP)
+function findZeroRate(f, a, b, customP; tol=1e-16, maxiter=1000)
+    fa, fb = f(a, customP), f(b, customP)
     if fa * fb > 0
         error("f(a) and f(b) must have opposite signs")
     end
 
     for i in 1:maxiter
         c = (a + b) / 2
-        fc = f(c; ChannelType = ChannelType, customP = customP)
+        fc = f(c, customP)
 
         if abs(fc) < tol || (b - a)/2 < tol
             return c  # found root
@@ -46,14 +46,8 @@ function findZeroRate(f, a, b; tol=1e-16, maxiter=1000, ChannelType = "Independe
     return (a + b) / 2  # best estimate after maxiter
 end
 
-function f(p; ChannelType = "Independent", customP = nothing)
-    if ChannelType == "Depolarizing"
-        pc = [1-p, p/3,p/3,p/3]
-    elseif ChannelType == "Independent"
-        pc = [(1-p)*(1-p), p*(1-p), p*(1-p),p*p]
-    else 
-        pc = customP(p)#[customP[1], customP[2], customP[3], customP[4]]
-    end
+function f(p, customP)
+    pc = customP(p)
     return 1 - H(pc)
 end
 
@@ -116,26 +110,18 @@ Returns a 2-column matrix `[p  induced_hashing_bound 1-h(p)]`.
 sweep_independent_grid(H, Lx, Lz, G; p_min=0.0, p_max=1.0, step=0.01, threads=Threads.nthreads()) =
     ParallelSweep.sweep_independent_grid(H, Lx, Lz, G; p_min, p_max, step, threads)
 
-"""
-    sweep_custom_grid(H, Lx, Lz, G, customP; p_min=0.0, p_max=1.0, step=0.01, threads=Threads.nthreads())
 
-Parallel sweep of custom channel with parameter customP as pI,pX,pZ,pY in [p_min, p_max] with the given step.
-Returns a 2-column matrix `[p  induced_hashing_bound 1-h(p)]`.
-"""
-sweep_custom_grid(H, Lx, Lz, G, customP; p_min=0.0, p_max=1.0, step=0.01, threads=Threads.nthreads()) =
-    ParallelSweep.sweep_custom_grid(H, Lx, Lz, G, customP; p_min, p_max, step, threads)
-
-sweep_custom_grid_exact(H, Lx, Lz, G, ps, customP; depolarizing=false, independent=false, threads::Int=Threads.nthreads()) =
-    ParallelSweep.sweep_custom_grid_exact(H, Lx, Lz, G, ps, customP; depolarizing, independent, threads) 
+sweep_custom_grid_exact(H, Lx, Lz, G, ps, customP; threads::Int=Threads.nthreads()) =
+    ParallelSweep.sweep_custom_grid_exact(H, Lx, Lz, G, ps, customP; threads) 
 
 
 """
-    sweep_hashing_grid(ps,  ChannelType; customP = nothing))
+    sweep_hashing_grid(ps,  ChannelFunc)
 
 Calculates hashing bound for a list of points ps 
 """
-sweep_hashing_grid(ps,  ChannelType; customP = nothing) =
-    ParallelSweep.sweep_hashing_grid(ps,  ChannelType; customP)
+sweep_hashing_grid(ps, customP) =
+    ParallelSweep.sweep_hashing_grid(ps, customP)
 
 
 
@@ -143,69 +129,27 @@ sweep_hashing_grid(ps,  ChannelType; customP = nothing) =
 
 """
 
-    InduceChannel(Stabilizers, ChannelType)
+    InduceChannel(Stabilizers, ChannelFunc)
 
-Takes in a list of stabilizers, as well as the ChannelType (currently only Depolarizing or Independent). If there is a moment where the induced channel is both better than 0 AND H(p_channel), it returns true
+Takes in a list of stabilizers, as well as the ChannelFunc (see Channels.jl). If there is a moment where the induced channel is both better than 0 AND H(p_channel), it returns true
 Stabilizer must be in boolean form not XYZ form. 
 """
-function check_induced_channel(S, pz; ChannelType = "Independent", sweep = false, ps = 0:.01:.5, customP = nothing, threads = Threads.nthreads())
+function check_induced_channel(S, pz, customP; sweep = false, ps = 0:.01:.5, threads = Threads.nthreads())
     # Build tableau/logicals
     H, Lx, Lz, G = QECInduced.tableau_from_stabilizers(S)
     # check that each of H, Lx, Lz, G commute within themselves
     @assert(Symplectic.sanity_check(H,Lx,Lz,G) == true, "Error Constructing Tableau")
-    
-    if ChannelType == "Depolarizing"
-        if sweep == true 
-            # Use ps directly instead of reconstructing the range
-            grid = QECInduced.sweep_custom_grid_exact(H, Lx, Lz, G, ps, customP; depolarizing=true, threads = Threads.nthreads())
-            return grid[:,2]
-        else 
-            hb = Induced.induced_channel_and_hashing_bound(H, Lx, Lz, G, ((1-pz), pz/3, pz/3, pz/3))
-            return hb
-        end 
-    elseif ChannelType == "Independent"
-        if sweep == true 
-            # Use ps directly instead of reconstructing the range
-            grid = QECInduced.sweep_custom_grid_exact(H, Lx, Lz, G, ps, customP; independent=true, threads = Threads.nthreads())
-            return grid[:,2]
-        else 
-            hb = Induced.induced_channel_and_hashing_bound(H, Lx, Lz, G, ((1-pz)*(1-pz), (1-pz)*pz, pz*(1-pz), pz*pz))
-            return hb
-        end
-    else # Custom 
-        if sweep == true 
-            # Use ps directly instead of reconstructing the range
-            grid = QECInduced.sweep_custom_grid_exact(H, Lx, Lz, G, ps, customP, threads = Threads.nthreads())
-            return grid[:,2]
-        else 
-            channel = customP(pz, tuple = true)
-            hb = Induced.induced_channel_and_hashing_bound(H, Lx, Lz, G, channel)
-            return hb
-        end
+    if sweep == true 
+        # Use ps directly instead of reconstructing the range
+        grid = QECInduced.sweep_custom_grid_exact(H, Lx, Lz, G, ps, customP, threads = Threads.nthreads())
+        return grid[:,2]
+    else 
+        channel = customP(pz, tuple = true)
+        hb = Induced.induced_channel_and_hashing_bound(H, Lx, Lz, G, channel)
+        return hb
     end
 end
 
-
-"""
-
-    demo()
-
-Tiny demo: n=1, k=1 (no stabilizers). Shows single p and small sweep.
-"""
-function demo()
-    n = 1
-    H = falses(0, 2n)
-    G = falses(0, 2n)
-    Lx = falses(1, 2n); Lx[1, 1] = true  # X on qubit 1
-    Lz = falses(1, 2n); Lz[1, n+1] = true  # Z on qubit 1
-
-    #=pbar,=# hb = induced_channel_and_hashing_bound(H, Lx, Lz, G; p=0.1)
-    @info "pbar shape = $(size(pbar)) sum=$(sum(pbar)) hashing_bound=$hb"
-
-    grid = sweep_depolarizing_grid(H, Lx, Lz, G; p_min=0.0, p_max=0.2, step=0.05, threads=2)
-    @info "grid =\n$(grid)"
-    nothing
-end
 
 end # module
 

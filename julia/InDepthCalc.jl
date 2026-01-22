@@ -224,10 +224,10 @@ logicalX = ["IIIIZ"]
 logicalZ = ["XXXXX"]
 G = ["XIIII", "IXIII", "IIXII", "IIIXI"]
 
-Stabilizers = ["ZZZZZZ"]
-logicalX = ["IZZZZZ", "IIZZZZ", "IIIZZZ", "IIIIZZ", "IIIIIZ"]
-logicalZ = ["XXIIII", "IXXIII", "IIXXII", "IIIXXI", "IIIIXX"]
-G = ["XIIIII"]
+#Stabilizers = ["ZZZZZZ"]
+#logicalX = ["IZZZZZ", "IIZZZZ", "IIIZZZ", "IIIIZZ", "IIIIIZ"]
+#logicalZ = ["XXIIII", "IXXIII", "IIXXII", "IIIXXI", "IIIIXX"]
+#G = ["XIIIII"]
 
 AllLogicalString = vcat(logicalX, logicalZ)
 
@@ -285,8 +285,8 @@ p = 0.1904775
 
 
 #pchannel = [(1-p)*(1-p), p*(1-p), p*(1-p), p*p]
-pchannel = [(1 - px) * (1 - pz), px * (1 - pz), pz * (1 - px), px * pz] 
-#pchannel = [(1-p), p/3, p/3, p/3]
+#pchannel = [(1 - px) * (1 - pz), px * (1 - pz), pz * (1 - px), px * pz] 
+pchannel = [(1-p), p/3, p/3, p/3]
 # calculate the probability of the syndromes 
 
 SyndromeDict = Dict() # making a dict where the 4 syndromes currently have no prob 
