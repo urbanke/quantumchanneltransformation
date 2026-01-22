@@ -29,10 +29,23 @@ use std::cmp::Ordering;
 use std::slice;
 
 #[inline(always)]
-fn prob_from_counts(pI: f64, pX: f64, pZ: f64, pY: f64, ni: u32, nx: u32, nz: u32, ny: u32) -> f64 {
-    pI.powi(ni as i32) * pX.powi(nx as i32) * pZ.powi(nz as i32) * pY.powi(ny as i32)
+fn prob_from_counts_log(
+    li: f64, lx: f64, lz: f64, ly: f64,
+    ni: u32, nx: u32, nz: u32, ny: u32
+) -> f64 {
+    // Same real-number value as pI^ni * pX^nx * pZ^nz * pY^ny, but faster.
+    // Not bit-for-bit identical to powi due to floating rounding.
+    //
+    // Avoid 0 * (-inf) => NaN when some p*=0 but the corresponding count is 0.
+    let mut s = 0.0f64;
+    if ni != 0 { s += (ni as f64) * li; }
+    if nx != 0 { s += (nx as f64) * lx; }
+    if nz != 0 { s += (nz as f64) * lz; }
+    if ny != 0 { s += (ny as f64) * ly; }
+    s.exp()
 }
 
+const INV_LN_2: f64 = 1.0 / std::f64::consts::LN_2;
 #[inline(always)]
 fn shannon_entropy_base2(p: &[f64]) -> f64 {
     p.iter()
@@ -72,6 +85,8 @@ fn count_ni_nx_nz_ny(al_u: &[u64], al_v: &[u64],
 
 #[no_mangle]
 pub extern "C" fn compute_pbar_and_hashing_bound(
+
+
     // Ttab packed: rows 0..(2^r - 1), words per row = words
     ttab_u_ptr: *const u64,
     ttab_v_ptr: *const u64,
@@ -102,9 +117,14 @@ pub extern "C" fn compute_pbar_and_hashing_bound(
     pZ: f64,
     pY: f64,
 
+
     // outputs
     //pbar_out_ptr: *mut f64, // length A*B  (A==B==2^k)
 ) -> f64 {
+    let li = pI.ln();
+    let lx = pX.ln();
+    let lz = pZ.ln();
+    let ly = pY.ln();
     let ttab_u = unsafe { slice::from_raw_parts(ttab_u_ptr, t_rows * words) };
     let ttab_v = unsafe { slice::from_raw_parts(ttab_v_ptr, t_rows * words) };
     let al_u = unsafe { slice::from_raw_parts(al_u_ptr, a_rows * words) };
@@ -144,14 +164,13 @@ pub extern "C" fn compute_pbar_and_hashing_bound(
     }
 
     let per_s_results: Vec<SRes> = (0..s_rows).into_par_iter().map(|s_idx| {
-        // views for SG row s
         let sg_u_row = &sg_u[s_idx * word_stride .. (s_idx + 1) * word_stride];
         let sg_v_row = &sg_v[s_idx * word_stride .. (s_idx + 1) * word_stride];
 
-        // We will build P_s(a,b) into a temporary buffer of size A×B
-        let mut ps = vec![0.0f64; a_dim_us * b_dim_us];
+        // Stream over (a,b) without allocating ps/tmp:
+        let mut p_s = 0.0f64;
+        let mut sum_p_ln_p = 0.0f64;
 
-        // For each (a,b), accumulate over t
         for a in 0..a_dim_us {
             let al_u_row = &al_u[a * word_stride .. (a + 1) * word_stride];
             let al_v_row = &al_v[a * word_stride .. (a + 1) * word_stride];
@@ -164,90 +183,38 @@ pub extern "C" fn compute_pbar_and_hashing_bound(
                     let tt_u_row = &ttab_u[t * word_stride .. (t + 1) * word_stride];
                     let tt_v_row = &ttab_v[t * word_stride .. (t + 1) * word_stride];
 
-                    // count types
                     let mut nx = 0u32;
                     let mut nz = 0u32;
                     let mut ny = 0u32;
                     for w in 0..word_stride {
                         let u = al_u_row[w] ^ bl_u_row[w] ^ sg_u_row[w] ^ tt_u_row[w];
                         let v = al_v_row[w] ^ bl_v_row[w] ^ sg_v_row[w] ^ tt_v_row[w];
-                        let xmask = u & !v;
-                        let zmask = !u & v;
-                        let ymask = u & v;
-                        nx += xmask.count_ones();
-                        nz += zmask.count_ones();
-                        ny += ymask.count_ones();
+                        nx += (u & !v).count_ones();
+                        nz += (!u & v).count_ones();
+                        ny += (u & v).count_ones();
                     }
                     let ni = n_sites_f - (nx + nz + ny);
-                    total += prob_from_counts(pI, pX, pZ, pY, ni, nx, nz, ny);
+                    total += prob_from_counts_log(li, lx, lz, ly, ni, nx, nz, ny);
                 }
-                ps[a * b_dim_us + b] = total;
+
+                p_s += total;
+                if total > 0.0 {
+                    sum_p_ln_p += total * total.ln();
+                }
             }
         }
 
-        // Probability of the syndrome p(s) = sum_{a,b} P_s(a,b)
-        let p_s: f64 = ps.iter().copied().sum();
-
-        // // ML (a*,b*)
-        // let mut ml_a = 0usize;
-        // let mut ml_b = 0usize;
-        // if p_s > 0.0 {
-        //     let mut best = 0.0f64;
-        //     for a in 0..a_dim_us {
-        //         for b in 0..b_dim_us {
-        //             let val = ps[a * b_dim_us + b];
-        //             if val > best {
-        //                 best = val;
-        //                 ml_a = a;
-        //                 ml_b = b;
-        //             }
-        //         }
-        //     }
-        // }
-
-        // Produce shifted table q_s(a',b') = P_s(a'⊕a*, b'⊕b*) / p_s
-        // let mut shifted = vec![0.0f64; a_dim_us * b_dim_us];
-        let h_s: f64;
-        if p_s > 0.0 {
-        //    for a_prime in 0..a_dim_us {
-        //        for b_prime in 0..b_dim_us {
-        //            let a = a_prime ^ ml_a;
-        //            let b = b_prime ^ ml_b;
-        //            shifted[a_prime * b_dim_us + b_prime] = ps[a * b_dim_us + b];
-        //        }
-        //    }
-            // Normalize to conditional and compute H(q_s)
-            let mut tmp = ps.clone();
-            for x in &mut tmp {
-                *x /= p_s;
-            }
-            h_s = shannon_entropy_base2(&tmp);
+        let p_weighted_entropy = if p_s > 0.0 {
+            (-sum_p_ln_p + p_s * p_s.ln()) * INV_LN_2
         } else {
-            h_s = 0.0;
-        }
+            0.0
+        };
 
         SRes {
-        //    ml_a,
-        //    ml_b,
             p_sum: p_s,
-            p_weighted_entropy: p_s * h_s,
-        //    shifted, // still unnormalized; used to build marginal p̄ later
+            p_weighted_entropy,
         }
     }).collect();
-
-    // Accumulate p̄(a',b') = Σ_s shifted(a',b'), then normalize it.
-    // for sr in &per_s_results {
-    //     for (i, v) in sr.shifted.iter().enumerate() {
-    //         pbar_accum[i] += *v;
-    //     }
-    // }
-    // let total_mass: f64 = pbar_accum.iter().copied().sum();
-    // let pbar_norm: Vec<f64> = if total_mass > 0.0 {
-    //     pbar_accum.iter().map(|&x| x / total_mass).collect()
-    // } else {
-    //     // degenerate channel; keep uniform to avoid NaNs
-    //     vec![1.0 / (a_dim as f64 * b_dim as f64); a_dim * b_dim]
-    // };
 
     // New: H_bar = Σ_s p(s) H(p(a',b'|s))
     let h_bar: f64 = per_s_results.iter().map(|sr| sr.p_weighted_entropy).sum::<f64>();
@@ -257,9 +224,6 @@ pub extern "C" fn compute_pbar_and_hashing_bound(
     let n_f = n_sites as f64;
     let hashing_bound = (k - h_bar) / n_f;
 
-    // Write p̄ to output
-    // let out = unsafe { slice::from_raw_parts_mut(pbar_out_ptr, pbar_norm.len()) };
-    // out.copy_from_slice(&pbar_norm);
 
     hashing_bound
 }

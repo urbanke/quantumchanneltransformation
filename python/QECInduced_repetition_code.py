@@ -71,6 +71,26 @@ def pauli_channel_independent(p):
     pY = p ** 2
     return normalize4((pI, pX, pZ, pY))
 
+
+
+def pauli_channel_xnine(x):
+    """
+    Independent X/Z channel with parameter p in [0,1]:
+       U,V ~ Bernoulli(p),  sigma = X^U Z^V.
+    Then:
+      pI = (1-p)^2
+      pX = p(1-p)
+      pZ = p(1-p)
+      pY = p^2
+    Returns 4-tuple (pI, pX, pZ, pY).
+    """
+    z = x/9 
+    pI = (1 - x) * (1 - z) 
+    pX = x * (1 - z)
+    pZ = z * (1 - x)
+    pY = x * z 
+    return normalize4((pI, pX, pZ, pY))
+
 def pauli_channel_depolarizing(p):
     """
     Depolarizing channel with parameter p in [0,1]:
@@ -292,8 +312,8 @@ if __name__ == "__main__":
     ell = 1
 
     # Show a single p example for each channel family
-    p_example = 0.11002786443835955
-    p_indep = pauli_channel_independent(p_example)
+    p_example = 0.2526118511695812
+    p_indep = pauli_channel_xnine(p_example)
     p_depol = pauli_channel_depolarizing(p_example)
 
     print("Single example at p = ", p_example)

@@ -26,11 +26,32 @@ def pauli_probs_independent(x):
       (pI, pX, pZ, pY): Pauli letter probs
       perr: per-qubit physical error rate = 1 - pI
     """
-    z = x 
+    z = x/9
     pI = (1.0 - x) * (1.0 - z)
     pX = x * (1.0 - z)
     pZ = z * (1.0 - x)
     pY = x * z
+
+    s = pI + pX + pZ + pY
+    if s <= 0:
+        return (1.0, 0.0, 0.0, 0.0), 0.0
+    pI, pX, pZ, pY = pI / s, pX / s, pZ / s, pY / s
+    perr = 1.0 - pI
+    return (pI, pX, pZ, pY), perr
+
+def pauli_probs_depolar(p):
+    """
+    Independent X/Z-component channel with z = x/9.
+
+    Returns:
+      (pI, pX, pZ, pY): Pauli letter probs
+      perr: per-qubit physical error rate = 1 - pI
+    """
+    
+    pI = (1.0 - p)
+    pX = p/3 
+    pZ = p/3
+    pY = p/3
 
     s = pI + pX + pZ + pY
     if s <= 0:
@@ -87,6 +108,8 @@ def conditional_logical_given_r(r, k, pI, pX, pZ, pY):
         return np.full((2, 2), 0.25, dtype=float)
     return J / Z
 
+
+
 def induced_hashing_bound_repetition(k, pI, pX, pZ, pY):
     """
     Induced hashing bound for a repetition code of length k under Pauli law (pI,pX,pZ,pY).
@@ -107,9 +130,10 @@ def induced_hashing_bound_repetition(k, pI, pX, pZ, pY):
         Pr[0] = 1.0
 
     hashing_r = np.zeros(k, dtype=float)
+    puv = np.zeros((4,1), dtype=float)
     for r in range(k):
         pbar = conditional_logical_given_r(r, k, pI, pX, pZ, pY)  # 2x2 over (u,v)
-        hashing_r[r] = max(0,(1.0 - H_base2(pbar.flatten())) / k)
+        hashing_r[r] = (1.0 - H_base2(pbar.flatten())) / k
 
     hashing_induced = float(np.dot(Pr, hashing_r))
     return hashing_induced, Pr, hashing_r
@@ -120,24 +144,24 @@ def induced_hashing_bound_repetition(k, pI, pX, pZ, pY):
 if __name__ == "__main__":
     # ---- Sweep the channel parameter (x), map to perr ----
     # x := X-flip probability; Z-flip uses z = x/9
-    x_grid = np.linspace(0.0, 0.3, 200)
-
+    x_grid = [0.236, 0.23857142857142857, 0.24114285714285713, 0.24371428571428572, 0.24628571428571427, 0.24885714285714286, 0.25142857142857145, 0.254, 0.25657142857142856, 0.2591428571428571, 0.26171428571428573, 0.2642857142857143, 0.26685714285714285, 0.2694285714285714, 0.272]
+    x_grid = np.linspace(0.188, .1906, 15)
     perr_grid = np.empty_like(x_grid)
     orig_vals = np.empty_like(x_grid)
     for i, x in enumerate(x_grid):
-        (pI, pX, pZ, pY), p = pauli_probs_independent(x)
+        (pI, pX, pZ, pY), p = pauli_probs_depolar(x)
         perr_grid[i] = p
         orig_vals[i] = 1.0 - H_base2([pI, pX, pY, pZ])
 
     # ---- Range of repetition lengths to consider ----
-    k_min, k_max = 7, 7
+    k_min, k_max = 2, 33
     ks = list(range(k_min, k_max + 1))
 
     # Compute induced bounds for each k, at every x
     all_ind_vals = np.zeros((len(ks), len(x_grid)), dtype=float)
     for ki, k in enumerate(ks):
         for xi, x in enumerate(x_grid):
-            (pI, pX, pZ, pY), _ = pauli_probs_independent(x)
+            (pI, pX, pZ, pY), _ = pauli_probs_depolar(x)
             val, _, _ = induced_hashing_bound_repetition(k, pI, pX, pZ, pY)
             all_ind_vals[ki, xi] = val
 
@@ -151,19 +175,21 @@ if __name__ == "__main__":
     plt.figure(figsize=(10, 6))
 
     # (1) Raw hashing bound for context
-    plt.plot(x_grid, orig_vals, linewidth=1.0, alpha=0.9,
+    plt.plot(perr_grid, orig_vals, linewidth=1.0, alpha=0.9,
              label="Original hashing bound (indep., z=x/9)")
 
     # (2) Optional: show a handful of k-curves faintly
-    sample_ks_to_plot = [3, 5, 7, 11, 17, 25, 33]  # edit as you like
+    sample_ks_to_plot = [3, 5, 7, 11]  # edit as you like
     for k, yk in zip(ks, all_ind_vals):
-        if k in sample_ks_to_plot:
-            plt.plot(x_grid, yk, linewidth=0.9, alpha=0.30, label=f"Induced (k={k})")
-        else:
-            plt.plot(x_grid, yk, linewidth=0.5, alpha=0.10)
+            plt.plot(perr_grid, yk, linewidth=0.9, alpha=0.100)#, label=f"Induced (k={k})")
+
 
     # (3) Best (envelope) over k
-    plt.plot(x_grid, best_over_k, linewidth=2.2, linestyle="-",
+    #diff_over_k = best_over_k - orig_vals
+    #print(x_grid[np.where(np.sign(diff_over_k[:-1]) != np.sign(diff_over_k[1:]))])
+    #print(x_grid[np.where(np.sign(best_over_k[:-1]) != np.sign(best_over_k[1:]))])
+    print(best_over_k)
+    plt.plot(perr_grid, best_over_k, linewidth=2.2, linestyle="-",
              label="Envelope = max over k")
 
     plt.xlabel("Per-qubit physical error rate  perr = 1 - pI")
