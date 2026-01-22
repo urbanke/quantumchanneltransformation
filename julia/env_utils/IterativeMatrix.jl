@@ -357,11 +357,11 @@ function All_Codes_DFS(channelParamFunc, n, k, p_range; r_specific=nothing,  new
     println(hb_best)
     println("=" ^ 70)
     println("Generating binary matrices ($s × $(2*n)) in standard block form")
-    println("Parameters: n=$n, k=$k, s=$s, grid_points=$points")
 
     if r_specific !== nothing
-        println("Testing only r=$r_specific")
+        println("Parameters: n=$n, k=$k, s=$s, r=$r_specific, grid_points=$points")
     else
+        println("Parameters: n=$n, k=$k, s=$s, grid_points=$points")
         println("Testing all r values from 0 to $s")
     end
     println("pz range: [$(p_range[1]), $(p_range[end])]")

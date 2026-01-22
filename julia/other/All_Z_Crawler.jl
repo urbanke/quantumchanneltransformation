@@ -6,8 +6,8 @@ include("../src/Symplectic.jl")
 include("../src/SGS.jl")
 include("../env_utils/Channels.jl")
 
-using .Symplectic, .SGS, .Channels
 using QECInduced
+using .Symplectic, .SGS, .Channels
 using Base.Threads
 using Plots
 using LinearAlgebra
@@ -28,7 +28,7 @@ function all_z_code_check(n, pz, channelParamFunc)
     S = falses(1,2n)
     S[1,(n+1):end] .= true 
     S = Matrix{Bool}(S)
-    hb_ind = QECInduced.check_induced_channel(S, pz, channelParamFunc; sweep=false, threads = threads)
+    hb_ind = QECInduced.check_induced_channel(S, pz, channelParamFunc; sweep=false, threads = 0)
     return hb_ind
 end 
 
@@ -229,7 +229,7 @@ function root_finder(n_max, channelParamFunc; pz=0.23,
             smallest_p[n] = p_star
 
             println("Bracket: [$p_lo, $p_hi]")
-            println("Threshold: $p_star")
+            println("Threshold: $(Channels.Independent_Skewed_X_Nine(p_star, plot = true))")
         end
 
         println("Elapsed total for n=$n: $elapsed_total seconds")

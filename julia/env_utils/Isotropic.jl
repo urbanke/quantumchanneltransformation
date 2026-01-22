@@ -386,7 +386,7 @@ function All_Codes_Random_SGS(channelParamFunc, n, k, r, p_range; newBest = noth
     println("pz range: [$(p_range[1]), $(p_range[end])]")
     println("=" ^ 70)
     
-    # Calculate total possible without constraints
+    println("Total matrices to be randomly searched: $trials")    
     
     count = 0
     last_print_count = 0
