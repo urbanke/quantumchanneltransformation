@@ -149,6 +149,38 @@ end
 
 
 """
+Randomly mix the rows of N (BitMatrix) using invertible GF(2) row operations.
+This preserves the row span and row independence while making the basis "random looking".
+"""
+function gf2_random_row_mix!(N::BitMatrix, rng)
+    d, n = size(N)
+    if d <= 1
+        return N
+    end
+
+    # Some random row swaps
+    for _ in 1:(2d)
+        i = rand(rng, 1:d)
+        j = rand(rng, 1:d)
+        if i != j
+            swap_rows!(N, i, j)
+        end
+    end
+
+    # Some random row XOR operations: row_i ^= row_j
+    for _ in 1:(4d)
+        i = rand(rng, 1:d)
+        j = rand(rng, 1:d)
+        if i != j
+            xor_row!(N, i, j)
+        end
+    end
+
+    return N
+end
+
+
+"""
     solve_linear_system_f2_with_random_gf2(A::BitMatrix, b::BitVector, rng) -> BitVector
 
 Solve Ax = b (mod 2) with randomization of free variables.
@@ -314,46 +346,34 @@ function random_isotropic_basis_with_structure(n::Int, s::Int, r::Int; rng = Ran
             end
         end
     end
-
     # -----------------------------------------
     # Remaining s-r rows: pure-Z only (X=0)
+    # (Compute nullspace ONCE, randomize basis, and take independent rows)
     # -----------------------------------------
-    for i in (r+1):s
-        success = false
-        attempts = 0
+    if s > r
+        # Build H_z from the X parts of the rows (these are the only nonzero X parts)
+        H_z = BitMatrix(undef, length(rows), n)
+        for (eq, u) in enumerate(rows)
+            H_z[eq, :] .= view(u, 1:n)
+        end
 
-        while !success
-            attempts += 1
-            attempts > 2000 && error("Could not generate independent pure-Z row $i after many attempts")
+        # Compute nullspace once
+        N_z = gf2_nullspace(H_z)   # d × n, rows are a basis for the nullspace
+        d = size(N_z, 1)
+        d == 0 && error("No remaining pure-Z isotropic directions")
 
-            # Build constraints u_x · z = 0 for all existing rows u
-            H_z = BitMatrix(undef, length(rows), n)
-            for (eq, u) in enumerate(rows)
-                H_z[eq, :] .= view(u, 1:n)
-            end
+        # Make sure there is enough room
+        @assert (s - r) <= d "Not enough independent pure-Z directions: need $(s-r), have $d"
 
-            N_z = gf2_nullspace(H_z)
-            size(N_z, 1) == 0 && error("No remaining pure-Z isotropic directions")
+        # Optional: randomize the basis for more randomness
+        gf2_random_row_mix!(N_z, rng)
 
-            # Sample random z from nullspace
-            z_part = falses(n)
-            for j in 1:size(N_z, 1)
-                if rand(rng, Bool)
-                    z_part .⊻= N_z[j, :]
-                end
-            end
-
-            # reject zero z (it would add nothing)
-            iszero(count(z_part)) && continue
-
-            # candidate full vector (0 | z_part)
+        # Take first (s-r) basis vectors (each is independent by construction)
+        for t in 1:(s - r)
+            z_part = BitVector(N_z[t, :])
             v = vcat(falses(n), z_part)
-
-            # Independence check (full 2n vector!)
-            if gf2_try_add!(basis, v)
-                push!(rows, v)
-                success = true
-            end
+            # We do not need gf2_try_add! here because rows of N_z are independent
+            push!(rows, v)
         end
     end
 
