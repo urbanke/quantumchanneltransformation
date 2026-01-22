@@ -366,28 +366,16 @@ function random_isotropic_basis_with_structure(n::Int, s::Int, r::Int; rng = Ran
     return S
 end
 
-function All_Codes_Random_SGS(ChannelType, n, k, r; pz=nothing, points=15, channelParamFunc=nothing, δ = .3, newBest = nothing, trials = 1e7, rng = MersenneTwister(2025), pz_range_override = nothing, concated = nothing, placement = "inner") 
+function All_Codes_Random_SGS(channelParamFunc, n, k, r, p_range; newBest = nothing, trials = 1e7, rng = MersenneTwister(2025), concated = nothing, placement = "inner") 
     s = n - k  # Number of rows in the (n-k) × (2n) matrix
     
     # Initialize best trackers for each grid point
-
+    points = length(p_range)
     S_best = [falses(s, 2n) for _ in 1:points]  # Best matrix at each grid point
     
-    # Compute pz if not provided
-    if pz === nothing 
-        pz = findZeroRate(f, 0, 0.5; maxiter=1000, ChannelType=ChannelType, channelParamFunc=channelParamFunc)
-    end 
-
-
-    if pz_range_override === nothing 
-        pz_range = range(.236,.272, length=points)
-        pz_range = range(pz - pz*δ/2, pz + pz*δ/4, length=points)   
-    else 
-        pz_range = pz_range_override 
-    end  
 
     if newBest === nothing 
-        hb_best = QECInduced.sweep_hashing_grid(pz_range, ChannelType; channelParamFunc = channelParamFunc)
+        hb_best = QECInduced.sweep_hashing_grid(p_range, channelParamFunc)
     else 
         hb_best = newBest
     end 
@@ -395,7 +383,7 @@ function All_Codes_Random_SGS(ChannelType, n, k, r; pz=nothing, points=15, chann
     println("=" ^ 70)
     println("Generating binary matrices ($s × $(2*n)) in standard block form")
     println("Parameters: n=$n, k=$k, s=$s, r=$r, grid_points=$points")
-    println("pz range: [$(pz_range[1]), $(pz_range[end])]")
+    println("pz range: [$(p_range[1]), $(p_range[end])]")
     println("=" ^ 70)
     
     # Calculate total possible without constraints
@@ -422,7 +410,7 @@ function All_Codes_Random_SGS(ChannelType, n, k, r; pz=nothing, points=15, chann
                 end
             end
             # Check the induced channel at all grid points
-            hb_grid = QECInduced.check_induced_channel(S, pz; ChannelType=ChannelType, sweep=true, ps=pz_range, channelParamFunc=channelParamFunc)
+            hb_grid = QECInduced.check_induced_channel(S, 0, channelParamFunc; sweep=true, ps=p_range)
             
             # Find which grid points improved
             improved_indices = findall(hb_grid .> (hb_best .+ eps()))
@@ -439,7 +427,7 @@ function All_Codes_Random_SGS(ChannelType, n, k, r; pz=nothing, points=15, chann
                 println("Improved at $(length(improved_indices)) grid point(s): $improved_indices")
                 println("\nGrid point details:")
                 for idx in improved_indices
-                    println("  Point $idx: pz=$(round(pz_range[idx], digits=4)), hb=$(round(hb_best[idx], digits=6))")
+                    println("  Point $idx: pz=$(round(p_range[idx], digits=4)), hb=$(round(hb_best[idx], digits=6))")
                 end
                 println("\nS_best (showing first improved point) =")
                 println(Symplectic.build_from_bits(S_best[improved_indices[1]]))

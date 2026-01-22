@@ -24,31 +24,16 @@ function smith_rep_maker(n)
 end 
 
 
-function repitition_code_check(channelParamFunc, n; pz=nothing, points=15, δ = .3, newBest = nothing, threads = Threads.nthreads(), pz_range_override = nothing, concated = nothing, placement = "inner") 
+function repitition_code_check(channelParamFunc, n, p_range; newBest = nothing, threads = Threads.nthreads(),  concated = nothing, placement = "inner") 
     s = n - 1  # Number of rows in the (n-k) × (2n) matrix
     
     # Initialize best trackers for each grid point
-
+    points = length(p_range)
     S_best = [falses(s, 2n) for _ in 1:points]  # Best matrix at each grid point
     r_best = fill(-1, points)  # Best r value at each grid point
-    
-    # Compute pz if not provided
-    if pz === nothing 
-        pz = findZeroRate(f, 0, 0.5, channelParamFunc; maxiter=1000)
-    end 
-
-    if pz_range_override === nothing 
-        pz_range = range(.236,.272, length=points)
-        pz_range = range(pz - pz*δ/2, pz + pz*δ/4, length=points)   
-    else 
-        pz_range = pz_range_override 
-    end  
-
-    #pz_range = range(.236,.272, length=points)
-    #pz_range = range(0.2334285714285714 - 0.0025714285714285856, 0.2334285714285714 + 0.0025714285714285856, length = points)
 
     if newBest === nothing 
-        hb_best = QECInduced.sweep_hashing_grid(pz_range, channelParamFunc)
+        hb_best = QECInduced.sweep_hashing_grid(p_range, channelParamFunc)
     else 
         hb_best = newBest
     end 
@@ -67,7 +52,7 @@ function repitition_code_check(channelParamFunc, n; pz=nothing, points=15, δ = 
         end
     end
     # Check the induced channel at all grid points
-    hb_grid = QECInduced.check_induced_channel(S, pz, channelParamFunc; sweep=true, ps=pz_range, threads = threads)
+    hb_grid = QECInduced.check_induced_channel(S, 0, channelParamFunc; sweep=true, ps=p_range, threads = threads)
     # Find which grid points improved
     improved_indices = findall(hb_grid .> (hb_best .+ eps()))
 
@@ -84,7 +69,7 @@ function repitition_code_check(channelParamFunc, n; pz=nothing, points=15, δ = 
         println("Improved at $(length(improved_indices)) grid point(s): $improved_indices")
         println("\nGrid point details:")
         for idx in improved_indices
-            println("  Point $idx: pz=$(round(pz_range[idx], digits=4)), hb=$(round(hb_best[idx], digits=6))")
+            println("  Point $idx: pz=$(round(p_range[idx], digits=4)), hb=$(round(hb_best[idx], digits=6))")
         end
         println("\nS_best (showing first improved point) =")
         println(Symplectic.build_from_bits(S_best[improved_indices[1]]))
@@ -210,12 +195,12 @@ end
 
 
 
-function printCodes(base_grid, points, pz_range, s_best, hashing, FileName)
+function printCodes(base_grid, points, p_range, s_best, hashing, FileName)
     open(FileName*".txt", "w") do file
         for i in 1:points
             if base_grid[i] > hashing[i]
                 s_best_point = Symplectic.build_from_bits(s_best[i])
-                write(file, "Point: $(pz_range[i])\n")
+                write(file, "Point: $(p_range[i])\n")
                 write(file, "Induced Hashing Bound: $(base_grid[i])\n")
                 write(file, "S Matrix:\n")
                 write(file, join(string.(s_best_point), " ") * "\n\n")
@@ -223,18 +208,18 @@ function printCodes(base_grid, points, pz_range, s_best, hashing, FileName)
         end
         write(file, string(base_grid) * "\n")
         write(file, "[")
-        for i in 1:(length(pz_range) - 1) 
-            write(file, string(pz_range[i]) * ",")
+        for i in 1:(length(p_range) - 1) 
+            write(file, string(p_range[i]) * ",")
         end 
-        write(file, string(pz_range[end]) * "]")
+        write(file, string(p_range[end]) * "]")
     end
 end 
 
-function printCodesSlurm(base_grid, points, pz_range, s_best, hashing)
+function printCodesSlurm(base_grid, points, p_range, s_best, hashing)
         for i in 1:points
             if base_grid[i] > hashing[i]
                 s_best_point = Symplectic.build_from_bits(s_best[i])
-                println("Point: $(pz_range[i])\n")
+                println("Point: $(p_range[i])\n")
                 println("Induced Hashing Bound: $(base_grid[i])\n")
                 println("S Matrix:\n")
                 println(join(string.(s_best_point), " ") * "\n\n")
@@ -242,10 +227,10 @@ function printCodesSlurm(base_grid, points, pz_range, s_best, hashing)
         end
         println(string(base_grid) * "\n")
         println("[")
-        for i in 1:(length(pz_range) - 1)
-            println(string(pz_range[i]) * ",")
+        for i in 1:(length(p_range) - 1)
+            println(string(p_range[i]) * ",")
         end
-        println(string(pz_range[end]) * "]")
+        println(string(p_range[end]) * "]")
 end
 
 end 

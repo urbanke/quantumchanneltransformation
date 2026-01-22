@@ -341,31 +341,16 @@ Returns:
 - S_best: Best stabilizer matrix found
 - r_best: The r value that gave the best result
 """
-function All_Codes_DFS(channelParamFunc, n, k; pz=nothing, r_specific=nothing, points=15, δ = .3, newBest = nothing, threads = Threads.nthreads(), trials = 1e6, useTrials = false, pz_range_override = nothing, concated = nothing, placement = "inner") 
+function All_Codes_DFS(channelParamFunc, n, k, p_range; r_specific=nothing,  newBest = nothing, threads = Threads.nthreads(), trials = 1e6, useTrials = false, concated = nothing, placement = "inner") 
     s = n - k  # Number of rows in the (n-k) × (2n) matrix
     
     # Initialize best trackers for each grid point
-
+    points = length(p_range)
     S_best = [falses(s, 2n) for _ in 1:points]  # Best matrix at each grid point
     r_best = fill(-1, points)  # Best r value at each grid point
     
-    # Compute pz if not provided
-    if pz === nothing 
-        pz = findZeroRate(f, 0, 0.5, channelParamFunc; maxiter=1000)
-    end 
-
-    if pz_range_override === nothing 
-        pz_range = range(.236,.272, length=points)
-        pz_range = range(pz - pz*δ/2, pz + pz*δ/4, length=points)   
-    else 
-        pz_range = pz_range_override 
-    end  
-
-    #pz_range = range(.236,.272, length=points)
-    #pz_range = range(0.2334285714285714 - 0.0025714285714285856, 0.2334285714285714 + 0.0025714285714285856, length = points)
-
     if newBest === nothing 
-        hb_best = QECInduced.sweep_hashing_grid(pz_range, channelParamFunc)
+        hb_best = QECInduced.sweep_hashing_grid(p_range, channelParamFunc)
     else 
         hb_best = newBest
     end 
@@ -379,7 +364,7 @@ function All_Codes_DFS(channelParamFunc, n, k; pz=nothing, r_specific=nothing, p
     else
         println("Testing all r values from 0 to $s")
     end
-    println("pz range: [$(pz_range[1]), $(pz_range[end])]")
+    println("pz range: [$(p_range[1]), $(p_range[end])]")
     println("=" ^ 70)
     
     # Calculate total possible without constraints
@@ -410,7 +395,7 @@ function All_Codes_DFS(channelParamFunc, n, k; pz=nothing, r_specific=nothing, p
             end
         end
         # Check the induced channel at all grid points
-        hb_grid = QECInduced.check_induced_channel(S, pz, channelParamFunc; sweep=true, ps=pz_range, threads = threads)
+        hb_grid = QECInduced.check_induced_channel(S, 0, channelParamFunc; sweep=true, ps=p_range, threads = threads)
         # Find which grid points improved
         improved_indices = findall(hb_grid .> (hb_best .+ eps()))
 
@@ -428,7 +413,7 @@ function All_Codes_DFS(channelParamFunc, n, k; pz=nothing, r_specific=nothing, p
             println("Improved at $(length(improved_indices)) grid point(s): $improved_indices")
             println("\nGrid point details:")
             for idx in improved_indices
-                println("  Point $idx: pz=$(round(pz_range[idx], digits=4)), hb=$(round(hb_best[idx], digits=6))")
+                println("  Point $idx: pz=$(round(p_range[idx], digits=4)), hb=$(round(hb_best[idx], digits=6))")
             end
             println("\nS_best (showing first improved point) =")
             println(Symplectic.build_from_bits(S_best[improved_indices[1]]))
@@ -467,21 +452,9 @@ To use threading, start Julia with: `julia -t auto` or `julia -t 8` (for 8 threa
 Check available threads with: `Threads.nthreads()`
 """
 
-function All_Codes_DFS_parallel(channelParamFunc, n, k; pz=nothing, use_threads=true, points = 15, δ = .3, newBest = nothing, trials = 1e6, useTrials = false, pz_range_override = nothing, concated = nothing, placement = "inner")  
+function All_Codes_DFS_parallel(channelParamFunc, n, k, p_range; use_threads=true, newBest = nothing, trials = 1e6, useTrials = false, concated = nothing, placement = "inner")  
     s = n - k
-
-    if pz === nothing 
-        pz = findZeroRate(f, 0, 0.5, channelParamFunc; maxiter=1000)
-    end
-
-
-    if pz_range_override === nothing 
-        pz_range = range(.236,.272, length=points)
-        pz_range = range(pz - pz*δ/2, pz + pz*δ/4, length=points)   
-    else 
-        pz_range = pz_range_override 
-    end  
-
+    points = length(p_range)
     n_threads = Threads.nthreads()
     println("=" ^ 70)
     println("PARALLEL SEARCH: Testing each r value independently")
@@ -508,7 +481,7 @@ function All_Codes_DFS_parallel(channelParamFunc, n, k; pz=nothing, use_threads=
             r_val = r_values[i]
             println("Thread $(Threads.threadid()): Starting r=$r_val")
             
-            hb, S = All_Codes_DFS(channelParamFunc, n, k; pz=pz, r_specific=r_val, δ = δ, newBest = newBest, points = points, threads = 0, trials = trials, useTrials = useTrials, pz_range_override = pz_range, concated = concated, placement = placement)
+            hb, S = All_Codes_DFS(channelParamFunc, n, k, p_range; r_specific=r_val, newBest = newBest, threads = 0, trials = trials, useTrials = useTrials, concated = concated, placement = placement)
             results[i] = (r=r_val, hb=hb, S=S)
             
             println("Thread $(Threads.threadid()): Completed r=$r_val, hb=$hb")
@@ -520,11 +493,11 @@ function All_Codes_DFS_parallel(channelParamFunc, n, k; pz=nothing, use_threads=
             r_val = r_values[i]
             println("\n--- Starting search for r=$r_val ---")
             
-            hb, S = All_Codes_DFS(channelParamFunc, n, k; pz=pz, r_specific=r_val, points = points,  δ = δ, newBest = newBest, trials = trials, useTrials = useTrials, pz_range_override = pz_range, concated = concated, placement = placement)
+            hb, S = All_Codes_DFS(channelParamFunc, n, k, p_range; r_specific=r_val, newBest = newBest, trials = trials, useTrials = useTrials, concated = concated, placement = placement)
             results[i] = (r=r_val, hb=hb, S=S)
         end
     end
-    total_best = QECInduced.sweep_hashing_grid(pz_range, channelParamFunc)
+    total_best = QECInduced.sweep_hashing_grid(p_range, channelParamFunc)
     for i in 1:n_r 
         replaceIndices = findall(results[i].hb .> total_best)
         if !isempty(replaceIndices)

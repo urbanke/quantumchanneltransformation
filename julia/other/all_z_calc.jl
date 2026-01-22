@@ -30,7 +30,7 @@ for n in 2:16
     p = myDict[n] 
     println(p) 
     pz_range_override = range(p,p,length = points)
-    hb = all_z_code_check(Channels.ninexz, n, pz) 
+    hb = all_z_code_check(Channels.Independent_Skewed_X_Nine, n, pz) 
     hbDict[n] = hb 
     println(hb)
 end 

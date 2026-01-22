@@ -256,7 +256,7 @@ end
 
 function main()
     n_max = 16
-    hashing, base_grid = root_finder_margin(n_max, Channels.ninexz)
+    hashing, base_grid = root_finder_margin(n_max, Channels.Independent_Skewed_X_Nine)
 end
 
 # Run the main function
