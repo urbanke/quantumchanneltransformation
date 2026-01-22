@@ -3,7 +3,7 @@
 #  - X on qubit i -> u_i = 1, v_i = 0
 #  - Z on qubit i -> u_i = 0, v_i = 1
 
-include("src/Symplectic.jl")
+include("../src/Symplectic.jl")
 
 using QECInduced, .Symplectic
 

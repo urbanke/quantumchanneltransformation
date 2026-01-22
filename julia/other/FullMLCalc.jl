@@ -1,9 +1,11 @@
-include("src/Symplectic.jl")
+include("../src/Symplectic.jl")
 using .Symplectic
 
 
-#using QECInduced
-
+# this is doing the entire ML decoding hashing bound calculator 
+# it first goes through all 4^n paulies and groups by syndromes 
+# then it goes through each syndrome and finds the ML decoder logical it should apply 
+# then it goes through all 4^n paulies, applies the syndrome offset and logical offset, and gets induced distribution (for each k logical) 
 
 # chat gpt code, cannot vouch for it  (this block only)
 
@@ -92,7 +94,7 @@ function print_logical_marginals(inducedDict, PS::Real, lilK::Int)
     end
 end
 
-#####
+##### end of gpt code 
 
 function printNice(S)
 	print("[")
@@ -170,7 +172,7 @@ function bin_to_dec(numberVec)
     return Int(out)
 end
 
-
+# You need to construct the whole stabilizer tableau 
 #=
 Stabilizers = ["ZZ", "IZIIX", "IIZXI"]
 #Stabilizers = ["ZXI", "IXX"]
@@ -181,45 +183,14 @@ G = ["XIIII", "IXIII", "IIXII"]
 
 
 
- 
+#= 
 Stabilizers = ["XIX", "IXX"]
 logicalX = ["IIX"]
 logicalZ = ["ZZZ"]
 G = ["ZII", "IZI"]
-
-
-
-
-
-#=
-
-
-
-Stabilizers = ["ZZ"]
-logicalX = ["IZ"]
-logicalZ = ["XX"]
-G = ["XI"]
-=#
-#logicalX = ["IIX"]
-#logicalZ = ["XYY"]
-
-#logicalX = Bool[0,0,1,0,0,0] # IIX
-#logicalZ = Bool[1,0,0,0,1,1] # XYY
-#=
-Stabilizers = ["ZIZIIIIII", "IZZIIIIII", "IIIZIZIII", "IIIIZZIII", "IIIIIIZIZ", "IIIIIIIZZ", "XXXIIIXXX", "XXXXXXIII"]
-logicalX = ["IIIIIIXXX"]
-logicalZ = ["IIZIIZIIZ"]
-G = ["XIIIIIIII",
-"IXIIIIIII",
-"IIIXIIIII",
-"IIIIXIIII",
-"IIIIIIXII",
-"IIIIIIIXI",
-"IIZIIIIII",
-"IIIIIZIII"]
 =# 
 
-Stabilizers = ["ZIIIZ", "IZIIZ", "IIZIZ", "IIIZZ"]
+Stabilizers = ["ZIIIZ", "IZIIZ", "IIZIZ", "IIIZZ"] 
 logicalX = ["IIIIZ"]
 logicalZ = ["XXXXX"]
 G = ["XIIII", "IXIII", "IIXII", "IIIXI"]
