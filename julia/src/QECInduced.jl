@@ -131,7 +131,7 @@ sweep_hashing_grid(ps, customP) =
 
     InduceChannel(Stabilizers, ChannelFunc)
 
-Takes in a list of stabilizers, as well as the ChannelFunc (see Channels.jl). If there is a moment where the induced channel is both better than 0 AND H(p_channel), it returns true
+Takes in a list of stabilizers, as well as the ChannelFunc (see env_utils/env_utils/Channels.jl). If there is a moment where the induced channel is both better than 0 AND H(p_channel), it returns true
 Stabilizer must be in boolean form not XYZ form. 
 """
 function check_induced_channel(S, pz, customP; sweep = false, ps = 0:.01:.5, threads = Threads.nthreads())

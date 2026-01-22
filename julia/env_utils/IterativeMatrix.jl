@@ -4,7 +4,7 @@ export iterate_standard_block_matrices_optimized, All_Codes_DFS_parallel, All_Co
 
 include("src/Symplectic.jl")
 include("src/SGS.jl")
-include("EnvelopeUtil.jl")
+include("env_utils/EnvelopeUtil.jl")
 
 using .Symplectic, .SGS, .EnvelopeUtil
 using QECInduced

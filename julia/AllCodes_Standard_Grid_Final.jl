@@ -4,11 +4,11 @@
 # ============================================
 include("src/Symplectic.jl")
 include("src/SGS.jl")
-include("EnvelopeUtil.jl")
+include("env_utils/EnvelopeUtil.jl")
 
-include("Isotropic.jl")
-include("IterativeMatrix.jl")
-include("Channels.jl")
+include("env_utils/Isotropic.jl")
+include("env_utils/IterativeMatrix.jl")
+include("env_utils/Channels.jl")
 
 using .Symplectic, .SGS,  .EnvelopeUtil, .Isotropic, .IterativeMatrix, .Channels
 using QECInduced
