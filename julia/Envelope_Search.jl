@@ -21,7 +21,7 @@ using Random
 
 
 
-function envelope_finder(n_range, channelParamFunc, p_range; randomSearch = false, useTrials = false, trials = 1e7, rng = MersenneTwister(2025), concated = nothing, placement = "inner", lowerrate = 1, upperate = 1, FileName = "hashing_bound_envelope") 
+function envelope_finder(n_range, channelParamFunc, p_range; randomSearch = false, useTrials = false, trials = 1e7, rng = MersenneTwister(2025), concated = nothing, placement = "inner", lowerrate = 1, upperate = 1, FileName = "hashing_bound_envelope", slurm = false) 
 
 
     hashing = QECInduced.sweep_hashing_grid(p_range, channelParamFunc)
@@ -70,7 +70,7 @@ function envelope_finder(n_range, channelParamFunc, p_range; randomSearch = fals
                     end
                 end  
                 println("Elapsed time: $elapsed_time_internal seconds") 
-                printCodes(base_grid, points, p_range, s_best, hashing, FileName)
+                printCodes(base_grid, points, p_range, s_best, hashing, FileName, slurm)
             end
          end
     end
@@ -113,8 +113,9 @@ function main()
     lowerrate = 0 # This is the lower range of k that will be searched, i.e. floor(n*lowerrate) (will ensure that k > 0) 
     upperate = 1 # This is the upper range of k that will be searched, i.e. ceil(n*upperate) (will ensure that k < n) 
     FileName = "Independent_Skewed_X_Nine_24_25"
+    slurm = false 
     hashing, base_grid, s_best = envelope_finder(n_range, channelParamFunc, p_range; randomSearch = true, trials = trials, concated = concated,
-                                                placement = placement, lowerrate = lowerrate, upperate = upperate, FileName = FileName)
+                                                placement = placement, lowerrate = lowerrate, upperate = upperate, FileName = FileName, slurm = slurm)
 end
 
 # Run the main function

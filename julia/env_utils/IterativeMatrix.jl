@@ -618,7 +618,7 @@ function All_Codes_DFS(channelParamFunc, n, k, p_range; r_specific=nothing,  new
         # Check the induced channel at all grid points
         hb_grid = QECInduced.check_induced_channel(S, 0, channelParamFunc; sweep=true, ps=p_range, threads = threads)
         # Find which grid points improved
-        improved_indices = findall(hb_grid .> (hb_best .+ eps()))
+        improved_indices = findall(hb_grid .> (hb_best .+ 1e-14)) # something slightly bigger than eps to account for numerical error
 
         
         # Update best for each improved point

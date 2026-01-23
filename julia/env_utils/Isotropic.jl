@@ -433,7 +433,7 @@ function All_Codes_Random_SGS(channelParamFunc, n, k, r, p_range; newBest = noth
             hb_grid = QECInduced.check_induced_channel(S, 0, channelParamFunc; sweep=true, ps=p_range)
             
             # Find which grid points improved
-            improved_indices = findall(hb_grid .> (hb_best .+ eps()))
+            improved_indices = findall(hb_grid .> (hb_best .+ 1e-14)) # something bigger than eps for numerical error
             
             # Update best for each improved point
             if !isempty(improved_indices)

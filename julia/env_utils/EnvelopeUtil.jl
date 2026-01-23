@@ -195,24 +195,29 @@ end
 
 
 
-function printCodes(base_grid, points, p_range, s_best, hashing, FileName)
-    open(FileName*".txt", "w") do file
-        for i in 1:points
-            if base_grid[i] > hashing[i]
-                s_best_point = Symplectic.build_from_bits(s_best[i])
-                write(file, "Point: $(p_range[i])\n")
-                write(file, "Induced Hashing Bound: $(base_grid[i])\n")
-                write(file, "S Matrix:\n")
-                write(file, join(string.(s_best_point), " ") * "\n\n")
+function printCodes(base_grid, points, p_range, s_best, hashing, FileName, slurm)
+    if slurm 
+        printCodesSlurm(base_grid, points, p_range, s_best, hashing)
+        return 
+    else 
+        open(FileName*".txt", "w") do file
+            for i in 1:points
+                if base_grid[i] > hashing[i]
+                    s_best_point = Symplectic.build_from_bits(s_best[i])
+                    write(file, "Point: $(p_range[i])\n")
+                    write(file, "Induced Hashing Bound: $(base_grid[i])\n")
+                    write(file, "S Matrix:\n")
+                    write(file, join(string.(s_best_point), " ") * "\n\n")
+                end
             end
+            write(file, string(base_grid) * "\n")
+            write(file, "[")
+            for i in 1:(length(p_range) - 1) 
+                write(file, string(p_range[i]) * ",")
+            end 
+            write(file, string(p_range[end]) * "]")
         end
-        write(file, string(base_grid) * "\n")
-        write(file, "[")
-        for i in 1:(length(p_range) - 1) 
-            write(file, string(p_range[i]) * ",")
-        end 
-        write(file, string(p_range[end]) * "]")
-    end
+    end 
 end 
 
 function printCodesSlurm(base_grid, points, p_range, s_best, hashing)
