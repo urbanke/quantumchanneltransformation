@@ -103,7 +103,7 @@ end
 
 function main()
     n_range = 2:1:14 # The range of n searched over 
-    trials = 2^15 + 1 # This is the number of trials. If there are more possiblem matrices than trials, do random search; else, do DFS. 
+    trials = 2^17 + 1 # This is the number of trials. If there are more possiblem matrices than trials, do random search; else, do DFS. 
     # Warning: This trials is searched for each (n,k,r) triple. So you may want a fewer trials than you think, because it will do it multiple times for each (n,k) tuple 
     channelParamFunc = Channels.Independent_Skewed_X_Nine # The type of channel searched over - see env_utils/Channels.jl for the options 
     p_range = range(0.24, .25, length = 15) # The range of $p$ searched over (do range(p,p, length =1) if you want to search one point)
@@ -112,8 +112,9 @@ function main()
     placement = "outer" # Where the concatenated code is. Options are inner or outer (does nothing if concated = nothing)
     lowerrate = 0 # This is the lower range of k that will be searched, i.e. floor(n*lowerrate) (will ensure that k > 0) 
     upperate = 1 # This is the upper range of k that will be searched, i.e. ceil(n*upperate) (will ensure that k < n) 
-    hashing, base_grid, s_best = envelope_finder(n_range, channelParamFunc, p_range; randomSearch = true, trials = 2^15 + 1, 
-                                                concated = concated, placement = placement, lowerrate = lowerrate, upperate = upperate)
+    FileName = "Independent_Skewed_X_Nine_24_25"
+    hashing, base_grid, s_best = envelope_finder(n_range, channelParamFunc, p_range; randomSearch = true, trials = trials, concated = concated,
+                                                placement = placement, lowerrate = lowerrate, upperate = upperate, FileName = FileName)
 end
 
 # Run the main function
