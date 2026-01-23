@@ -49,7 +49,7 @@ function envelope_finder(n_range, channelParamFunc, p_range; randomSearch = fals
             higherk = Int(min(floor(n*upperate - eps()), n-1)) 
             for k in lowerk:higherk
                 elapsed_time_internal = @elapsed begin
-                    for r in 0:0
+                    for r in 0:(n-k)
                         base_trials = count_standard_block_matrices(n, k; r) 
                         if base_trials <= 0 
                             base_trials = trials 

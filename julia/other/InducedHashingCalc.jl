@@ -130,9 +130,24 @@ end
 
 Stabilizers1 = ["ZIIIZ", "IZIIZ", "IIZIZ", "IIIZZ"]
 Stabilizers = ["ZIIZ", "IZIZ", "IIZZ"]
-
+Stabilizers = ["ZZZZZZZZZZZZZZZ"]
+#Stabilizers = ["ZIZ", "IZZ"]
+println(Stabilizers)
 # optional - concatenate stabilizers into n1 x n2 length one 
-#Stabilizers = concat_stabilizers_strings(Stabilizers1, Stabilizers) # I think the first input should be bigger (i think it is the outer code)
+#Stabilizers = concat_stabilizers_strings(Stabilizers1, Stabilizers) # I think the first input should be bigger (i think it is the outer code)channelParamFunc = Channels.Independent_Skewed_X_Nine # change this 
+
+channelParamFunc = Channels.Independent_Skewed_X_Nine # change this 
+points = 50
+pz_range = range(.23, 0.25, length = points)
+hashing = QECInduced.sweep_hashing_grid(pz_range, channelParamFunc)
+
+print("[")
+for i in pz_range[1:end-1]
+    print(Channels.Independent_Skewed_X_Nine(i;plot=true), ", ")
+end 
+println(Channels.Independent_Skewed_X_Nine(pz_range[end];plot=true), "]")
+
+println(hashing)
 
 
 S = Symplectic.build_from_stabs(Stabilizers)
@@ -149,32 +164,25 @@ H, Lx, Lz, G = QECInduced.tableau_from_stabilizers(S)
 #@show size(Lz) # (k, 2n)
 #@show size(G)  # (r, 2n)
 
-@show H
-@show Lx
-@show Lz
-@show G
+#@show H
+#@show Lx
+#@show Lz
+#@show G
 
 # check that each of H, Lx, Lz, G commute within themselves
-@show Symplectic.sanity_check(H, Lx, Lz, G)
+#@show Symplectic.sanity_check(H, Lx, Lz, G)
 
-points = 50
-pz_range = range(0.23, .25, length = points)
+#pz_range = range(.231, 0.232, length = points)
+
 
 pz = 0 
 
-channelParamFunc = Channels.Independent_Skewed_X_Nine # change this 
 
-
-hashing = QECInduced.sweep_hashing_grid(pz_range, channelParamFunc)
 hb_grid = QECInduced.check_induced_channel(S, pz, channelParamFunc; sweep=true, ps=pz_range, threads = 0)
 #@show p_channel
-print("[")
-for i in pz_range[1:end-1]
-    print(Channels.Independent_Skewed_X_Nine(i;plot=true), ", ")
-end 
-println(Channels.Independent_Skewed_X_Nine(pz_range[end];plot=true), "]")
-println(hashing)
+
 println(hb_grid) 
+
 
 
 
