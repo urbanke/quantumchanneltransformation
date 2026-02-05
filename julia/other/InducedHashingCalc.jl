@@ -81,6 +81,35 @@ function concat_stabilizers_strings(Sout::Vector{String}, Sin::Vector{String}; o
     return out
 end
 
+function printNice(S)
+    print("[")
+    for i in 1:size(S)[1] - 1
+        print("\"")
+        print(build_from_bits(S[i,:]))
+        print("\", ")
+    end 
+    i = size(S)[1] 
+    println("\"",build_from_bits(S[i,:]),"\"]")
+end
+
+function build_from_bits(S)
+    n = div(length(S),2) 
+    Xs = S[1:n]
+    Zs = S[n+1:(2*n)]
+        tempString = ""
+        for j in 1:n 
+            if Xs[j] & Zs[j]
+                tempString = tempString*"Y" 
+            elseif Xs[j] 
+                tempString = tempString*"X" 
+            elseif Zs[j] 
+                tempString = tempString*"Z" 
+            else 
+                tempString = tempString*"I" 
+            end
+        end
+    return tempString
+end
 
 
 
@@ -130,24 +159,45 @@ end
 
 Stabilizers1 = ["ZIIIZ", "IZIIZ", "IIZIZ", "IIIZZ"]
 Stabilizers = ["ZIIZ", "IZIZ", "IIZZ"]
-#Stabilizers = ["ZIZ", "IZZ"]
-Stabilizers = ["ZZZZZZZZZZZZZZ"]
-println(Stabilizers)
-# optional - concatenate stabilizers into n1 x n2 length one 
-#Stabilizers = concat_stabilizers_strings(Stabilizers1, Stabilizers) # I think the first input should be bigger (i think it is the outer code)channelParamFunc = Channels.Independent_Skewed_X_Nine # change this 
+Stabilizers = ["ZIZ", "IZZ"]
+Stabilizers = ["ZIZ"]
+Stabilizers = ["ZIIIIIII","ZZIIIIII","ZIZIIIII","IIIIIIIX","IIIIIIXX","IIIIIXIX"]
+Stabilizers = ["ZIIIZ", "IZIIZ", "IIZIZ", "IIIZZ"]
+Stabilizers = ["ZIIIIIIIIIIIIIII", "ZZIIIIIIIIIIIIII", "ZIZIIIIIIIIIIIII", "ZZZZIIIIIIIIIIII","ZIIIZIIIIIIIIIII","ZZIIZZIIIIIIIIII","ZIIIIIIIZIIIIIII","IIIIIIIIXIXIXIXI",
+               "IIIIIIIIIIIIIIIX", "IIIIIIIIIIIIIIXX", "IIIIIIIIIIIIIXIX", "IIIIIIIIIIIIXXXX","IIIIIIIIIIIXIIIX","IIIIIIIIIIXXIIXX","XIIIIIIIXIIIIIII"]
 
-channelParamFunc = Channels.Independent_Skewed_X_Nine # change this 
-points = 50
-pz_range = range(.23, 0.25, length = points)
+Stabilizers = ["ZIIIIIIIIIIIIIII", "ZZIIIIIIIIIIIIII", "ZIZIIIIIIIIIIIII", "ZIIIZIIIIIIIIIII","ZIIIIIIIZIIIIIII","ZIZIIIIIZIZIIIII","ZIIIZIIIZIIIZIII",
+               "IIIIIIIIIIIIIIIX", "IIIIIIIIIIIIIIXX", "IIIIIIIIIIIIIXIX", "IIIIIIIIIIIXIIIX","IIIIIIIXIIIIIIIX","IIIIIIIXIXIIIXIX","IIIXIIIXIIIXIIIX","IIIIIIIIXIXIXIXI"]
+
+Stabilizers = ["ZZZZZZZZ", "IZIZIZIZ", "IIZZIIZZ", 
+               "XXXXXXXX", "XIXIXIXI", "XXIIXXII",]
+
+
+Stabilizers = ["ZXIIIIIIIIIIIIII", "ZIXIIIIIIIIIIIII", "YZZXIIIIIIIIIIII", "YZIIIIIIZXIIIIII", "YZIIZXIIIIIIIIII", "YIZIZIXIIIIIIIII", "XYYYYZZXIIIIIIII", "YZIIIIIIZXIIIIII", "YIZIIIIIZIXIIIII", "XYYZIIIIYZZXIIII", "YIIIZIIIZIIIXIII", "XYIIYZIIYZIIZXII","XIYIYIZIYIZIZIXI","ZXXXXYYZXYYYYZZX"]
+
+
+Stabilizers = ["XZZYZYYXZYYXYXXZ", "ZYYXYXXZYXXZXZZY", "IIIIIIIIXZZYZYYX", "IIIIIIIIZYYXYXXZ", "IIIIXZZYIIIIZYYX", "IIIIZYYXIIIIYXXZ", "IIXZIIZYIIZYIIYX", "IIZYIIYXIIYXIIXZ", "IXIZIZIYIZIYIYIX", "IZIYIYIXIYIXIXIZ", "IIIIIIIIIIIIXZZY", "IIIIIIXZIIIIIIZY","IIIIIIZYIIIIIIYX", "IIIIIIIIIIXZIIZY", "IIIIIIIIIIZYIIYX"]
+
+Stabilizers = ["XIIIIIIIII", "IXIIIIIIIX", "IIXIIIIIIX", "IIIXIIIIIX", "IIIIXIIIIX", "IIIIIXIIIX", "IIIIIIXIIX", "IIIIIIIXIX", "IIIIIIIIXX"]
+Stabilizers = ["XIIIIIIIII", "IXIIIIIIII", "IIXIIIIIII", "IIIXIIIIII", "IIIIXIIIII", "IIIIIXIIIX", "IIIIIIXIIX", "IIIIIIIXIX", "IIIIIIIIXX"]
+Stabilizers = ["ZIIIZ", "IZIIZ", "IIZIZ", "IIIZZ"]
+Stabilizers1 = ["XX"]
+
+
+
+#println(Stabilizers)
+
+# optional - concatenate stabilizers into n1 x n2 length one 
+#Stabilizers = concat_stabilizers_strings(Stabilizers, Stabilizers1) # I think the first input should be bigger (i think it is the outer code)channelParamFunc = Channels.Independent_Skewed_X_Nine # change this 
+Stabilizers = ["XXXXZZZZYZ", "YIIIIIIIXI", "IZIIIIIIXI", "IIZIIIIIXI", "IIIYIIIIXI", "IIIIXIIIIX", "IIIIIXIIIX", "IIIIIIXIIX", "IIIIIIIXIX"]
+Stabilizers = ["ZZZZXXXXYX", "YIIIIIIIZI", "IXIIIIIIZI", "IIXIIIIIZI", "IIIYIIIIZI", "IIIIZIIIIZ", "IIIIIZIIIZ", "IIIIIIZIIZ", "IIIIIIIZIZ"]
+
+
+channelParamFunc = Channels.Depolarizing # change this 
+points = 15
+pz_range = range(0.19035625, .1906, length = 15)
 hashing = QECInduced.sweep_hashing_grid(pz_range, channelParamFunc)
 
-print("[")
-for i in pz_range[1:end-1]
-    print(Channels.Independent_Skewed_X_Nine(i;plot=true), ", ")
-end 
-println(Channels.Independent_Skewed_X_Nine(pz_range[end];plot=true), "]")
-
-println(hashing)
 
 
 S = Symplectic.build_from_stabs(Stabilizers)
@@ -158,32 +208,47 @@ S = Matrix{Bool}(S)
 # Build tableau/logicals
 H, Lx, Lz, G = QECInduced.tableau_from_stabilizers(S)
 
+#H= Symplectic.build_from_stabs( ["ZZZZZZZZ", "IZIZIZIZ", "IIIIZZZZ", "XXXXXXXX", "XIXIXIXI", "XXXXIIII"])
+#Lx=    Symplectic.build_from_stabs( ["IIZZIIZZ", "IIIIIZIZ"])
+#Lz=    Symplectic.build_from_stabs(["XIXIIIII", "XXIIXXII"])
+#G=           Symplectic.build_from_stabs(["XIIIIIII", "XXIIIIII", "XIIIXIII", "IIIIIIIZ", "IIIIIIZZ", "IIIZIIIZ"])
+
+
 
 #@show size(H)  # (r, 2n)
 #@show size(Lx) # (k, 2n)
 #@show size(Lz) # (k, 2n)
 #@show size(G)  # (r, 2n)
 
-#@show H
-#@show Lx
-#@show Lz
-#@show G
+
+print("Stabilizers= ")
+printNice(H)
+print("logicalX=    ")
+printNice(Lx)
+print("logicalZ=    ")
+printNice(Lz)
+print("G=           ")
+printNice(G)
 
 # check that each of H, Lx, Lz, G commute within themselves
-#@show Symplectic.sanity_check(H, Lx, Lz, G)
+@show Symplectic.sanity_check(H, Lx, Lz, G)
 
-#pz_range = range(.231, 0.232, length = points)
 
 
 pz = 0 
 
-times = @elapsed begin  
-    hb_grid = QECInduced.check_induced_channel(S, pz, channelParamFunc; sweep=true, ps=pz_range, threads = 0)
-end
+hb_grid = QECInduced.check_induced_channel(S, pz, channelParamFunc; sweep=true, ps=pz_range, threads = 0)
 #@show p_channel
 
+print("[")
+for i in pz_range[1:end-1]
+    print(channelParamFunc(i;plot=true), ", ")
+end 
+println(channelParamFunc(pz_range[end];plot=true), "]")
+
+println(hashing)
+
 println(hb_grid) 
-println(times)
 
 
 

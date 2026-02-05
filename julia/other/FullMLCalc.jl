@@ -173,13 +173,6 @@ function bin_to_dec(numberVec)
 end
 
 # You need to construct the whole stabilizer tableau 
-#=
-Stabilizers = ["ZZ", "IZIIX", "IIZXI"]
-#Stabilizers = ["ZXI", "IXX"]
-logicalX = ["IIIXI","IIIIX"]
-logicalZ = ["XIXZI","XXIIZ"]
-G = ["XIIII", "IXIII", "IIXII"]
-=# 
 
 
 
@@ -190,15 +183,48 @@ logicalZ = ["ZZZ"]
 G = ["ZII", "IZI"]
 =# 
 
-Stabilizers = ["ZIIIZ", "IZIIZ", "IIZIZ", "IIIZZ"] 
-logicalX = ["IIIIZ"]
-logicalZ = ["XXXXX"]
-G = ["XIIII", "IXIII", "IIXII", "IIIXI"]
+#Stabilizers = ["ZIIIZ", "IZIIZ", "IIZIZ", "IIIZZ"] 
+#logicalX = ["IIIIZ"]
+#logicalZ = ["XXXXX"]
+#G = ["XIIII", "IXIII", "IIXII", "IIIXI"]
 
 #Stabilizers = ["ZZZZZZ"]
 #logicalX = ["IZZZZZ", "IIZZZZ", "IIIZZZ", "IIIIZZ", "IIIIIZ"]
 #logicalZ = ["XXIIII", "IXXIII", "IIXXII", "IIIXXI", "IIIIXX"]
 #G = ["XIIIII"]
+
+
+
+Stabilizers = ["ZIZ", "IZZ"]
+logicalX = ["IIZ"]
+logicalZ = ["XXX"]
+G = ["XII", "IXI"]
+
+
+
+
+#Stabilizers = ["ZIZ"]
+#logicalX = ["IIZ", "IZI"]
+#logicalZ = ["XXX", "IXI" ]
+#G = ["XII"]
+
+#Stabilizers = ["ZZ"]
+#logicalX = ["XX"]
+#logicalZ = ["IZ"]
+#G = ["XI"]
+# AllInOrder = ["ZZZZZZZZ", "IZIZIZIZ", "IIZZIIZZ", "IIIIZZZZ", "IIIZIIIZ", "IIIIIZIZ", "IIIIIIZZ", "IIIIIIIZ"]
+# AllInOrder = ["XXXXXXXX", "XIXIXIXI", "XXIIXXII", "XXXXIIII", "XIIIXIII", "XIXIIIII", "XXIIIIII", "XIIIIIII"]
+
+Stabilizers= ["ZZZZZZZZ", "IZIZIZIZ", "IIIIZZZZ", "XXXXXXXX", "XIXIXIXI", "XXXXIIII"]
+logicalZ=    ["IIZZIIZZ", "IIIIIZIZ"]
+logicalX=    ["XIXIIIII", "XXIIXXII"]
+G=           ["XIIIIIII", "XXIIIIII", "XIIIXIII", "IIIIIIIZ", "IIIIIIZZ", "IIIZIIIZ"]
+
+Stabilizers= ["ZZZZZZZZ", "IZIZIZIZ", "IIZZIIZZ", "XXXXXXXX", "XIXIXIXI", "XXIIXXII"]
+logicalZ=    ["IIIIZZZZ", "IIIZIIIZ"]
+logicalX=    ["XIIIXIII", "XXXXIIII"]
+G=           ["XIIIIIII", "XXIIIIII", "XIXIIIII", "IIIIIIIZ", "IIIIIIZZ", "IIIIIZIZ"]
+
 
 AllLogicalString = vcat(logicalX, logicalZ)
 
@@ -251,6 +277,7 @@ px = 0.235
 pz = px/9
 p = 0.1905
 p = 0.1904775
+p = .19
 
 #Any["IZXXX", "ZIXIX", "IIXXI"]
 
@@ -285,7 +312,6 @@ for i in 0:(4^n - 1) # there are 3 quaterary symbols so i will say there are 2^6
 
 	#println(SyndromeDict)
 end 
-
 
 
 function errorBasedOnSynd(recieved,PS, pchannel,AllLogical)
@@ -374,7 +400,8 @@ function inducedChannel(recieved,PS, pchannel,AllLogical, repair)
 
 	#printDict(inducedDict)
 
-	println("Syrdome: (",repairs,"), (k - H(p(a,b|s))/n = ",(div(lilK,2)-h)/n)
+	#println("Residual: (",repairs,"), (k - H(p(a,b|s))/n = ",(div(lilK,2)-h)/n)
+	println("Induced Rate: $((div(lilK,2)-h)/n)")
  	return h*PS, inducedDictPrePS
 end
 
@@ -395,7 +422,7 @@ for i in 0:r-1
 	trueErrorRep = bin_to_dec(idxPos) 
 	println("True Error Operator Applied: ", trueErrorRep)
 	h_temp, p_temp = inducedChannel(AllRecieved[i],SyndromeDict[i], pchannel,AllLogical, syndromeRepair[i])
-	print_induced_channel(p_temp, SyndromeDict[i], lilK; top=32)
+	#print_induced_channel(p_temp, SyndromeDict[i], lilK; top=32)
 	print_logical_marginals(p_temp, SyndromeDict[i], lilK)
 	global H += h_temp
 	global totalProb = mergewith(+, totalProb, p_temp)  # Dict(:a => 1.4, :b => 1.4)

@@ -1,4 +1,4 @@
-module EnvelopeUtil
+module KernelUtil
 export repitition_code_check, check_threading_setup, concat_stabilizers_bool, printCodes, printCodesSlurm, h
 
 include("../src/Symplectic.jl")

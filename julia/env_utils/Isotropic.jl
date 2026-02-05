@@ -1,5 +1,5 @@
 module Isotropic
-export random_isotropic_basis_with_structure, All_Codes_Random_SGS
+export random_isotropic_basis_with_structure, All_Codes_Random
 
 
 include("../src/Symplectic.jl")
@@ -386,7 +386,7 @@ function random_isotropic_basis_with_structure(n::Int, s::Int, r::Int; rng = Ran
     return S
 end
 
-function All_Codes_Random_SGS(channelParamFunc, n, k, r, p_range; newBest = nothing, trials = 1e7, rng = MersenneTwister(2025), concated = nothing, placement = "inner") 
+function All_Codes_Random(channelParamFunc, n, k, r, p_range; newBest = nothing, trials = 1e7, rng = MersenneTwister(2025), concated = nothing, placement = "inner") 
     s = n - k  # Number of rows in the (n-k) × (2n) matrix
     
     # Initialize best trackers for each grid point
@@ -403,7 +403,7 @@ function All_Codes_Random_SGS(channelParamFunc, n, k, r, p_range; newBest = noth
     println("=" ^ 70)
     println("Generating binary matrices ($s × $(2*n)) in standard block form")
     println("Parameters: n=$n, k=$k, s=$s, r=$r, grid_points=$points")
-    println("pz range: [$(p_range[1]), $(p_range[end])]")
+    println("p range: [$(p_range[1]), $(p_range[end])]")
     println("=" ^ 70)
     
     println("Total matrices to be randomly searched: $trials")    
@@ -466,6 +466,61 @@ function All_Codes_Random_SGS(channelParamFunc, n, k, r, p_range; newBest = noth
     return hb_best, S_best
 end
 
+
+function All_Codes_Random_AllCodes(channelParamFunc, n, k, r, p;  trials = 1e7, rng = MersenneTwister(2025), concated = nothing, placement = "inner") 
+    s = n - k  # Number of rows in the (n-k) × (2n) matrix
+    
+    # Initialize best trackers for each grid point
+    S_best = [falses(s, 2n) for _ in 1:trials]  # Best matrix at each grid point
+    S_all = [falses(s, 2n) for _ in 1:trials]  # Best matrix at each grid point
+    H_all = zeros(trials)
+
+
+    println("=" ^ 70)
+    println("Generating binary matrices ($s × $(2*n)) in standard block form")
+    println("Parameters: n=$n, k=$k, s=$s, r=$r")
+    println("p = $p")
+    println("=" ^ 70)
+    
+    println("Total matrices to be randomly searched: $trials")    
+    
+    count = 0
+    last_print_count = 0
+    print_interval = max(1, div(trials, 20))  # Print ~20 times
+    
+    println("\nStarting enumeration with orthogonality constraints...\n")
+    
+    for i in 1:trials
+        try 
+            M = random_isotropic_basis_with_structure(n, s, r; rng = rng)
+            count += 1
+            
+            # Convert to Bool matrix
+            S = Matrix{Bool}(M)
+            
+            if !isnothing(concated) 
+                if placement == "inner"
+                    S = concat_stabilizers_bool(S, concated)
+                else 
+                    S = concat_stabilizers_bool(concated, S)
+                end
+            end
+            # Check the induced channel at all grid points
+            H_all[count] = QECInduced.check_induced_channel(S, p, channelParamFunc; sweep=false)
+            S_all[count] = copy(S) 
+            # Find which grid points improved
+        catch e 
+            continue
+        end
+    end
+    
+    println("\n" * "=" ^ 70)
+    println("SEARCH COMPLETE")
+    println("=" ^ 70)
+    println("Valid matrices found (satisfying orthogonality): $count")
+        
+    return H_all, S_all
+end
 
 
 end #module

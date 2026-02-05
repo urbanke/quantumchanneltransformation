@@ -1,5 +1,5 @@
 module IterativeMatrix
-export iterate_standard_block_matrices_optimized, All_Codes_DFS_parallel, All_Codes_DFS, count_standard_block_matrices
+export iterate_standard_block_matrices_optimized, All_Codes_DFS_parallel, All_Codes_Iterate, count_standard_block_matrices
 
 
 include("../src/Symplectic.jl")
@@ -562,7 +562,7 @@ Returns:
 - S_best: Best stabilizer matrix found
 - r_best: The r value that gave the best result
 """
-function All_Codes_DFS(channelParamFunc, n, k, p_range; r_specific=nothing,  newBest = nothing, threads = Threads.nthreads(), trials = 1e6, useTrials = false, concated = nothing, placement = "inner") 
+function All_Codes_Iterate(channelParamFunc, n, k, p_range; r_specific=nothing,  newBest = nothing, threads = Threads.nthreads(), trials = 1e6, useTrials = false, concated = nothing, placement = "inner") 
     s = n - k  # Number of rows in the (n-k) × (2n) matrix
     
     # Initialize best trackers for each grid point
@@ -585,7 +585,7 @@ function All_Codes_DFS(channelParamFunc, n, k, p_range; r_specific=nothing,  new
         println("Parameters: n=$n, k=$k, s=$s, grid_points=$points")
         println("Testing all r values from 0 to $s")
     end
-    println("pz range: [$(p_range[1]), $(p_range[end])]")
+    println("p range: [$(p_range[1]), $(p_range[end])]")
     println("=" ^ 70)
     
     # Calculate total possible without constraints
@@ -649,8 +649,6 @@ function All_Codes_DFS(channelParamFunc, n, k, p_range; r_specific=nothing,  new
     println("\n" * "=" ^ 70)
     println("SEARCH COMPLETE")
     println("=" ^ 70)
-    println("Valid matrices found (satisfying orthogonality): $count")
-    println("Total possible (without constraints): $total_possible_no_constraints")
     
     println("\nBreakdown by r:")
     for r_val in sort(collect(keys(count_by_r)))
@@ -659,6 +657,64 @@ function All_Codes_DFS(channelParamFunc, n, k, p_range; r_specific=nothing,  new
     return hb_best, S_best#, r_best
 end
 
+function All_Codes_Iterate_AllCodes(channelParamFunc, n, k, p; r_specific=nothing, threads = Threads.nthreads(), trials = 1e6, useTrials = false, concated = nothing, placement = "inner") 
+    s = n - k  # Number of rows in the (n-k) × (2n) matrix
+    
+    # Initialize best trackers for each grid point
+    S_all = [falses(s, 2n) for _ in 1:trials]  # Best matrix at each grid point
+    H_all = zeros(trials)
+
+    println("=" ^ 70)
+    println("Generating binary matrices ($s × $(2*n)) in standard block form")
+
+    if r_specific !== nothing
+        println("Parameters: n=$n, k=$k, s=$s, r=$r_specific")
+    else
+        println("Parameters: n=$n, k=$k, s=$s")
+        println("Testing all r values from 0 to $s")
+    end
+    println("p = $p")
+    println("=" ^ 70)
+    
+    # Calculate total possible without constraints
+    total_possible_no_constraints = count_standard_block_matrices_constrained(n, k; r=r_specific)
+    println("\nTotal matrices without orthogonality constraints: $total_possible_no_constraints")
+    
+    count = 0
+    count_by_r = Dict{Int,Int}()
+    last_print_count = 0
+    print_interval = max(1, div(total_possible_no_constraints, 20))  # Print ~20 times
+    
+    println("\nStarting enumeration with orthogonality constraints...\n")
+    
+    # Use the optimized iterator with orthogonality checking
+    for info in iterate_standard_block_matrices_optimized_constraints(n, k; r=r_specific)
+        count += 1
+        r_val = info.r
+        count_by_r[r_val] = get(count_by_r, r_val, 0) + 1
+        
+        # Convert to Bool matrix
+        S = Matrix{Bool}(info.M)
+        
+        if !isnothing(concated) 
+            if placement == "inner"
+                S = concat_stabilizers_bool(S, concated)
+            else 
+                S = concat_stabilizers_bool(concated, S)
+            end
+        end
+        # Check the induced channel at all grid points
+        H_all[count] = QECInduced.check_induced_channel(S, p, channelParamFunc; sweep=false, threads = threads)
+        S_all[count] = copy(S) 
+        # Find which grid points improved
+
+    end
+    
+    println("\n" * "=" ^ 70)
+    println("SEARCH COMPLETE")
+    println("=" ^ 70)
+    return H_all, S_all
+end
 
 
 

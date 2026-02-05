@@ -134,11 +134,16 @@ sweep_hashing_grid(ps, channelParamFunc) =
 Takes in a list of stabilizers, as well as the ChannelFunc (see env_utils/env_utils/Channels.jl). If there is a moment where the induced channel is both better than 0 AND H(p_channel), it returns true
 Stabilizer must be in boolean form not XYZ form. 
 """
-function check_induced_channel(S, pz, channelParamFunc; sweep = false, ps = 0:.01:.5, threads = Threads.nthreads())
+function check_induced_channel(S, pz, channelParamFunc; sweep = false, ps = 0:.01:.5, threads = Threads.nthreads(), FullTableau = false)
     # Build tableau/logicals
-    H, Lx, Lz, G = QECInduced.tableau_from_stabilizers(S)
+    if FullTableau
+        H, Lx, Lz, G = S 
+    else 
+        H, Lx, Lz, G = QECInduced.tableau_from_stabilizers(S)
+        @assert(Symplectic.sanity_check(H,Lx,Lz,G) == true, "Error Constructing Tableau")
+    end
+#    println(S)
     # check that each of H, Lx, Lz, G commute within themselves
-    @assert(Symplectic.sanity_check(H,Lx,Lz,G) == true, "Error Constructing Tableau")
     if sweep == true 
         # Use ps directly instead of reconstructing the range
         grid = QECInduced.sweep_custom_grid_exact(H, Lx, Lz, G, ps, channelParamFunc, threads = Threads.nthreads())

@@ -7,10 +7,10 @@ include("src/SGS.jl")
 include("env_utils/EnvelopeUtil.jl")
 
 include("env_utils/Isotropic.jl")
-include("env_utils/IterativeMatrix.jl")
+include("kernel_entropy/IterativeMatrixKernel.jl")
 include("env_utils/Channels.jl")
 
-using .Symplectic, .SGS,  .EnvelopeUtil, .Isotropic, .IterativeMatrix, .Channels
+using .Symplectic, .SGS,  .EnvelopeUtil, .Isotropic, .IterativeMatrixKernel, .Channels
 using QECInduced
 using Base.Threads
 using Plots
@@ -31,23 +31,12 @@ function envelope_finder(n_range, channelParamFunc, p_range; randomSearch = true
     s_best = Vector{Any}(undef, points)
     elapsed_time = @elapsed begin
         for n in n_range
-            # we know the smiths codes are good, so we should guarantee that we check them.  
-            best_grid, S_grid = repitition_code_check(channelParamFunc, n, p_range; newBest = best_grid, concated = nothing, placement = placement) 
-            improve_indices = findall(best_grid .> base_grid)
-            s_best[improve_indices] = S_grid[improve_indices]
-            base_grid = max.(base_grid,best_grid)
-            if !isnothing(concated) #should also check just concatenatng it with the smith code (same idea as above)
-                best_grid, S_grid = repitition_code_check(channelParamFunc, n, p_range; newBest = best_grid, concated = concated, placement = placement)
-                improve_indices = findall(best_grid .> base_grid)
-                s_best[improve_indices] = S_grid[improve_indices]
-                base_grid = max.(base_grid,best_grid)
-            end
             lowerk = Int(min(max(ceil(n*lowerrate), 1) , n-1))
             higherk = Int(min(floor(n*upperate - eps()), n-1)) 
             for k in lowerk:higherk
                 elapsed_time_internal = @elapsed begin
                     for r in 0:(n-k)
-                        base_trials = count_standard_block_matrices(n, k; r) 
+                        base_trials = count_standard_block_matrices_constrained(n, k; r) 
                         if base_trials <= 0 
                             base_trials = trials + 1 
                         end 
@@ -58,7 +47,6 @@ function envelope_finder(n_range, channelParamFunc, p_range; randomSearch = true
                             s_best[improve_indices] = S_grid[improve_indices]
                             base_grid = max.(base_grid,best_grid)
                         else 
-                            println("Using Iterative Search")
                             best_grid, S_grid = All_Codes_Iterate(channelParamFunc, n, k, p_range; threads = 0, r_specific = r, newBest = best_grid, trials = trials, concated = concated, placement = placement)
                             improve_indices = findall(best_grid .> base_grid)
                             s_best[improve_indices] = S_grid[improve_indices]
@@ -99,19 +87,19 @@ end
 
 
 function main()
-    n_range = 2:1:5 # The range of n searched over 
-    trials = 2^10 # This is the number of trials. If there are more possiblem matrices than trials, do random search; else, do DFS. 
+    n_range = 11:1:15 # The range of n searched over 
+    trials = 2^19 # This is the number of trials. If there are more possiblem matrices than trials, do random search; else, do DFS. 
     # Warning: This trials is searched for each (n,k,r) triple. So you may want a fewer trials than you think, because it will do it multiple times for each (n,k) tuple 
-    channelParamFunc = Channels.Independent_Skewed_X_Nine # The type of channel searched over - see env_utils/Channels.jl for the options 
-    p_range = range(0.24, .26, length = 15) # The range of $p$ searched over (do range(p,p, length =1) if you want to search one point)
+    channelParamFunc = Channels.Depolarizing # The type of channel searched over - see env_utils/Channels.jl for the options 
+    p_range = range(0.19035625, .1906, length = 15) # The range of $p$ searched over (do range(p,p, length =1) if you want to search one point)
     concated = nothing # what the code is concatenated with. Options are nothing or a code constructed with Bool[] (see below for examples)
     # Bool[0 0 0 0 0 0 1 1 1 1 1 1] #nothing # Bool[0 0 0 0 0 1 0 0 0 1; 0 0 0 0 0 0 1 0 0 1; 0 0 0 0 0 0 0 1 0 1; 0 0 0 0 0 0 0 0 1 1]
     placement = "outer" # Where the concatenated code is. Options are inner or outer (does nothing if concated = nothing)
     lowerrate = 0 # This is the lower range of k that will be searched, i.e. floor(n*lowerrate) (will ensure that k > 0) 
-    upperate = 1 # This is the upper range of k that will be searched, i.e. ceil(n*upperate) (will ensure that k < n) 
-    FileName = "Independent_Skewed_X_Nine_24_25"
+    upperate = 1/4 # This is the upper range of k that will be searched, i.e. ceil(n*upperate) (will ensure that k < n) 
+    FileName = "KernelMethod"
     slurm = false 
-    hashing, base_grid, s_best = envelope_finder(n_range, channelParamFunc, p_range; randomSearch = true, trials = trials, concated = concated,
+    hashing, base_grid, s_best = envelope_finder(n_range, channelParamFunc, p_range; randomSearch = false, trials = trials, concated = concated,
                                                 placement = placement, lowerrate = lowerrate, upperate = upperate, FileName = FileName, slurm = slurm)
 end
 
